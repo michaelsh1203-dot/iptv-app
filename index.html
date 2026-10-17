@@ -218,6 +218,8 @@
                 rawUrl = `${server}/series/${user}/${pass}/${streamId}.${ext || 'mp4'}`;
             }
 
+            // מעבר דרך הפרוקסי כדי למנוע חסימת Mixed Content בדפדפן
+            const proxiedUrl = getProxyUrl(rawUrl);
             const video = document.getElementById('video-player');
 
             if (hls) {
@@ -225,7 +227,7 @@
                 hls = null;
             }
 
-            video.src = rawUrl;
+            video.src = proxiedUrl;
             video.play().catch(e => console.log("Play error:", e));
         }
     </script>
