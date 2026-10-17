@@ -1,47 +1,47 @@
 const express = require('express');
 const path = require('path');
-const { Readable } = require('stream');
+const http = require('http');
+const https = require('https');
+const { URL } = require('url');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// הגשת קבצי האפליקציה
 app.use(express.static(path.join(__dirname)));
 
-// נתיב הפרוקסי המקומי בשרת
-app.get('/proxy', async (req, res) => {
+app.get('/proxy', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
         return res.status(400).send('Missing url parameter');
     }
 
     try {
-        const response = await fetch(targetUrl, {
+        const parsedUrl = new URL(targetUrl);
+        const lib = parsedUrl.protocol === 'https:' ? https : http;
+
+        const proxyReq = lib.get(targetUrl, {
             headers: {
                 'User-Agent': 'VLC/3.0.20 LibVLC/3.0.20',
                 'Accept': '*/*',
                 'Connection': 'keep-alive'
-            },
-            redirect: 'follow'
+            }
+        }, (proxyRes) => {
+            // העתקת כותרות והגדרת CORS
+            Object.keys(proxyRes.headers).forEach(key => {
+                res.setHeader(key, proxyRes.headers[key]);
+            });
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.status(proxyRes.statusCode);
+
+            proxyRes.pipe(res);
         });
 
-        // העתקת כותרות והגדרת CORS
-        response.headers.forEach((value, name) => {
-            res.setHeader(name, value);
+        proxyReq.on('error', (err) => {
+            res.status(500).send('Proxy Error: ' + err.message);
         });
-        
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.status(response.status);
 
-        // הזרמת הוידאו/נתונים בצורה רציפה ללקוח
-        if (response.body) {
-            const nodeStream = Readable.fromWeb(response.body);
-            nodeStream.pipe(res);
-        } else {
-            res.end();
-        }
     } catch (err) {
-        res.status(500).send('Proxy Error: ' + err.message);
+        res.status(500).send('Invalid URL: ' + err.message);
     }
 });
 
