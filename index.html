@@ -156,7 +156,7 @@
             try {
                 sidebarContent.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm animate-pulse">טוען נתונים מהשרת...</div>';
 
-                const proxyBase = `http://${window.location.host}/proxy?url=&token=my-super-secret-token-12345&url=`;
+                const proxyBase = `http://${window.location.host}/proxy?token=my-super-secret-token-12345&url=`;
 
                 const catUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_live_categories`;
                 const catRes = await fetch(proxyBase + encodeURIComponent(catUrl));
