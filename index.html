@@ -170,7 +170,7 @@
                 
                 const title = item.name || item.title || 'ערוץ';
                 const streamId = item.stream_id || item.series_id;
-                const ext = item.container_extension || 'm3u8';
+                const ext = item.container_extension || 'mp4';
 
                 card.innerHTML = `<span class="truncate text-sm font-semibold text-slate-200 group-hover:text-cyan-400 transition">${title}</span>
                                   <span class="text-xs bg-slate-900 text-slate-400 px-2 py-1 rounded-lg">▶ צפה</span>`;
@@ -209,7 +209,7 @@
 
             document.getElementById('current-title').textContent = title;
 
-            // עבור שידורים חיים ננסה גם פורמט TS ישיר וגם M3U8 במידת הצורך
+            // שימוש בפורמט חי ישיר בפורמט TS למניעת שגיאות M3U8
             let rawUrl = '';
             if (currentTab === 'live') {
                 rawUrl = `${server}/live/${user}/${pass}/${streamId}.ts`;
@@ -222,26 +222,13 @@
             const proxiedUrl = getProxyUrl(rawUrl);
             const video = document.getElementById('video-player');
 
-            if (hls) hls.destroy();
-
-            if (currentTab === 'live' && Hls.isSupported()) {
-                const m3u8Url = getProxyUrl(`${server}/live/${user}/${pass}/${streamId}.m3u8`);
-                hls = new Hls({
-                    p2pConfig: { live: true },
-                    xhrSetup: function (xhr, url) {
-                        // ודאות שהקריאה לענפי ה-M3U8 וה-TS תעבור דרך הפרוקסי
-                        if (!url.startsWith(window.location.origin) && !url.startsWith('/proxy')) {
-                            xhr.open('GET', getProxyUrl(url), true);
-                        }
-                    }
-                });
-                hls.loadSource(m3u8Url);
-                hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-            } else {
-                video.src = proxiedUrl;
-                video.play().catch(() => {});
+            if (hls) {
+                hls.destroy();
+                hls = null;
             }
+
+            video.src = proxiedUrl;
+            video.play().catch(e => console.log("Play error:", e));
         }
     </script>
 </body>
