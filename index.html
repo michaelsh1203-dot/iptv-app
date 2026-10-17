@@ -202,14 +202,13 @@
             initApp();
         }
 
-       function playStream(streamId, title, ext) {
+        function playStream(streamId, title, ext) {
             const server = localStorage.getItem('iptv_server');
             const user = localStorage.getItem('iptv_user');
             const pass = localStorage.getItem('iptv_pass');
 
             document.getElementById('current-title').textContent = title;
 
-            // שימוש בכתובת המקורית של ה-M3U8 עבור שידורים חיים
             let rawUrl = '';
             if (currentTab === 'live') {
                 rawUrl = `${server}/live/${user}/${pass}/${streamId}.m3u8`;
@@ -226,10 +225,18 @@
                 hls = null;
             }
 
-            // אם הדפדפן תומך ב-HLS או שימוש בספרייה
-            if (Hls.isSupported() && currentTab === 'live') {
-                hls = new Hls();
-                hls.loadSource(rawUrl);
+            if (Hls.isSupported() && (currentTab === 'live' || rawUrl.endsWith('.m3u8'))) {
+                hls = new Hls({
+                    xhrSetup: function (xhr, url) {
+                        // הפניית כל קריאות ה-HLS דרך הפרוקסי למניעת שגיאת Mixed Content
+                        if (!url.startsWith(window.location.origin) && !url.startsWith('/proxy')) {
+                            xhr.open('GET', getProxyUrl(url), true);
+                        } else {
+                            xhr.open('GET', url, true);
+                        }
+                    }
+                });
+                hls.loadSource(getProxyUrl(rawUrl));
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log("Play error:", e));
@@ -238,10 +245,10 @@
                     console.error('HLS error details:', data);
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = rawUrl;
+                video.src = getProxyUrl(rawUrl);
                 video.play().catch(e => console.log("Play error:", e));
             } else {
-                video.src = rawUrl;
+                video.src = getProxyUrl(rawUrl);
                 video.play().catch(e => console.log("Play error:", e));
             }
         }
