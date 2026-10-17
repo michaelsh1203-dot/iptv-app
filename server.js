@@ -14,7 +14,14 @@ app.use('/proxy', (req, res) => {
 
     const client = targetUrl.startsWith('https') ? https : http;
 
-    const proxyReq = client.get(targetUrl, (proxyRes) => {
+    const options = {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*'
+        }
+    };
+
+    const proxyReq = client.get(targetUrl, options, (proxyRes) => {
         res.writeHead(proxyRes.statusCode, proxyRes.headers);
         proxyRes.pipe(res);
     });
