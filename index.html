@@ -170,7 +170,7 @@
                 
                 const title = item.name || item.title || 'ערוץ';
                 const streamId = item.stream_id || item.series_id;
-                const ext = item.container_extension || 'mp4';
+                const ext = item.container_extension || 'm3u8';
 
                 card.innerHTML = `<span class="truncate text-sm font-semibold text-slate-200 group-hover:text-cyan-400 transition">${title}</span>
                                   <span class="text-xs bg-slate-900 text-slate-400 px-2 py-1 rounded-lg">▶ צפה</span>`;
@@ -225,30 +225,17 @@
                 hls = null;
             }
 
+            const proxiedUrl = getProxyUrl(rawUrl);
+
             if (Hls.isSupported() && (currentTab === 'live' || rawUrl.endsWith('.m3u8'))) {
-                hls = new Hls({
-                    xhrSetup: function (xhr, url) {
-                        // הפניית כל קריאות ה-HLS דרך הפרוקסי למניעת שגיאת Mixed Content
-                        if (!url.startsWith(window.location.origin) && !url.startsWith('/proxy')) {
-                            xhr.open('GET', getProxyUrl(url), true);
-                        } else {
-                            xhr.open('GET', url, true);
-                        }
-                    }
-                });
-                hls.loadSource(getProxyUrl(rawUrl));
+                hls = new Hls();
+                hls.loadSource(proxiedUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log("Play error:", e));
                 });
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    console.error('HLS error details:', data);
-                });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = getProxyUrl(rawUrl);
-                video.play().catch(e => console.log("Play error:", e));
             } else {
-                video.src = getProxyUrl(rawUrl);
+                video.src = proxiedUrl;
                 video.play().catch(e => console.log("Play error:", e));
             }
         }
