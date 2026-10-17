@@ -5,27 +5,26 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(__dirname));
-app.get('/proxy', (req, res) => {
+
+app.use('/proxy', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
-        return res.status(400).send('Missing URL parameter');
+        return res.status(400).send('Missing target URL');
     }
 
     const client = targetUrl.startsWith('https') ? https : http;
 
-    client.get(targetUrl, (proxyRes) => {
-        let contentType = proxyRes.headers['content-type'];
-        if (contentType) {
-            res.setHeader('content-type', contentType);
-        }
-        res.writeHead(proxyRes.statusCode);
+    const proxyReq = client.get(targetUrl, (proxyRes) => {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
         proxyRes.pipe(res);
-    }).on('error', (err) => {
+    });
+
+    proxyReq.on('error', (err) => {
         console.error('Proxy error:', err);
-        res.status(500).send('Proxy error: ' + err.message);
+        res.status(500).send('Proxy error');
     });
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
