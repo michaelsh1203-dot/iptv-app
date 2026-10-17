@@ -211,8 +211,7 @@
 
             let rawUrl = '';
             if (currentTab === 'live') {
-                // עקיפת חסימת ה-M3U8: פנייה ישירה לשידור ה-TS
-                rawUrl = `${server}/live/${user}/${pass}/${streamId}.ts`;
+                rawUrl = `${server}/live/${user}/${pass}/${streamId}.m3u8`;
             } else if (currentTab === 'movies') {
                 rawUrl = `${server}/movie/${user}/${pass}/${streamId}.${ext || 'mp4'}`;
             } else {
@@ -228,9 +227,17 @@
 
             const proxiedUrl = getProxyUrl(rawUrl);
 
-            // ניגון הזרמת וידאו ישירה דרך הנגן
-            video.src = proxiedUrl;
-            video.play().catch(e => console.log("Play error:", e));
+            if (Hls.isSupported() && rawUrl.includes('.m3u8')) {
+                hls = new Hls();
+                hls.loadSource(proxiedUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                    video.play().catch(e => console.log("Play error:", e));
+                });
+            } else {
+                video.src = proxiedUrl;
+                video.play().catch(e => console.log("Play error:", e));
+            }
         }
     </script>
 </body>
