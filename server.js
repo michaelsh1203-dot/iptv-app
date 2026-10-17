@@ -14,22 +14,31 @@ app.use('/proxy', (req, res) => {
     }
 
     const parsedTarget = urlModule.parse(targetUrl);
-    const protocol = parsedTarget.protocol === 'https:' ? https : http;
+    const isHttps = parsedTarget.protocol === 'https:';
+    const protocol = isHttps ? https : http;
+
+    // הגדרת Headers מלאים המתחזים לנגן IPTV מקורי
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Connection': 'keep-alive'
+    };
+
+    if (req.headers['range']) {
+        headers['Range'] = req.headers['range'];
+    }
 
     const options = {
         hostname: parsedTarget.hostname,
-        port: parsedTarget.port || (parsedTarget.protocol === 'https:' ? 443 : 80),
+        port: parsedTarget.port || (isHttps ? 443 : 80),
         path: parsedTarget.path,
         method: req.method,
-        headers: {
-            'User-Agent': 'IPTVSmartersPro',
-            'Accept': '*/*',
-            'Connection': 'keep-alive'
-        }
+        headers: headers
     };
 
     const proxyReq = protocol.request(options, (proxyRes) => {
-        // טיפול בהפניות (Redirects 301/302)
+        // טיפול בהפניות (Redirects)
         if (proxyRes.statusCode >= 300 && proxyRes.statusCode < 400 && proxyRes.headers.location) {
             let redirectUrl = proxyRes.headers.location;
             if (!redirectUrl.startsWith('http')) {
@@ -40,7 +49,7 @@ app.use('/proxy', (req, res) => {
 
         const contentType = proxyRes.headers['content-type'] || '';
         
-        // אם מדובר בקובץ M3U8 (פלייליסט), נשכתב את הקישורים הפנימיים שיעברו דרך ה-Proxy
+        // אם מדובר ב-M3U8 (פלייליסט), נשכתב את השורות כך שכל סגמנט (.ts) יעבור גם הוא דרך הפרוקסי
         if (contentType.includes('mpegurl') || targetUrl.includes('.m3u8')) {
             let body = '';
             proxyRes.setEncoding('utf8');
@@ -56,16 +65,19 @@ app.use('/proxy', (req, res) => {
 
                 res.writeHead(proxyRes.statusCode, {
                     'Content-Type': 'application/vnd.apple.mpegurl',
-                    'Access-Control-Allow-Origin': '*'
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Headers': '*'
                 });
                 res.end(rewrittenBody);
             });
         } else {
-            // עבור וידאו רגיל (.ts / .mp4) או קריאות JSON
-            res.writeHead(proxyRes.statusCode, {
+            // הזרמת ה-stream באופן ישיר
+            const responseHeaders = {
                 ...proxyRes.headers,
-                'Access-Control-Allow-Origin': '*'
-            });
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Headers': '*'
+            };
+            res.writeHead(proxyRes.statusCode, responseHeaders);
             proxyRes.pipe(res);
         }
     });
