@@ -1,11 +1,9 @@
 const express = require('express');
-const fetch = require('node-fetch');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.static('public')); // או תיקיית השורש לפי מבנה הפרויקט שלך
+app.use(express.static('public'));
 
-// פרוקסי נקי ויציב לשליפת ערוצים, קטגוריות וסטרימים ללא חסימות
 app.get('/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
@@ -20,7 +18,6 @@ app.get('/proxy', async (req, res) => {
             res.setHeader('content-type', contentType);
         }
 
-        // אם מדובר בשידור חי או בנתוני טקסט/JSON
         const data = await response.text();
         res.send(data);
     } catch (err) {
