@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player - Direct Client</title>
+    <title>IPTV Player - Fullscreen Controls</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
@@ -14,7 +14,7 @@
 
     <!-- Header -->
     <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 p-4 flex justify-between items-center shadow-lg z-10">
-        <h1 class="text-xl font-bold text-cyan-400">IPTV Player (ישיר מהמכשיר)</h1>
+        <h1 class="text-xl font-bold text-cyan-400">IPTV Player</h1>
         <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-md shadow-cyan-900/50">
             👤 חשבונות
         </button>
@@ -59,7 +59,7 @@
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">כתובת שרת (Server URL)</label>
-                    <input type="text" id="cfg-server" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr" placeholder="https://tv.example.com">
+                    <input type="text" id="cfg-server" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">שם משתמש (Username)</label>
@@ -84,7 +84,7 @@
         let hls = null;
 
         document.addEventListener('DOMContentLoaded', () => {
-            const server = localStorage.getItem('iptv_server') || 'https://tv.business-cloud-8.ru';
+            const server = localStorage.getItem('iptv_server') || 'http://tv.business-cloud-8.ru';
             const user = localStorage.getItem('iptv_user') || '';
             const pass = localStorage.getItem('iptv_pass') || '';
 
@@ -112,6 +112,10 @@
             initApp();
         }
 
+        function getProxyUrl(targetUrl) {
+            return `/proxy?url=${encodeURIComponent(targetUrl)}`;
+        }
+
         async function initApp() {
             const server = localStorage.getItem('iptv_server');
             const user = localStorage.getItem('iptv_user');
@@ -123,18 +127,18 @@
 
             try {
                 let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
-                const catRes = await fetch(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`);
+                const catRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`));
                 categories = await catRes.json();
                 populateCategories();
 
                 let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
-                const streamRes = await fetch(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`);
+                const streamRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`));
                 streams = await streamRes.json();
 
                 renderStreams(streams);
             } catch (err) {
                 console.error('Error:', err);
-                document.getElementById('items-list').innerHTML = '<div class="text-center text-red-400 py-10 col-span-full">שגיאה בטעינת נתונים (ודא שכתובת השרת תומכת ב-HTTPS)</div>';
+                document.getElementById('items-list').innerHTML = '<div class="text-center text-red-400 py-10 col-span-full">שגיאה בטעינת נתונים מהשרת</div>';
             }
         }
 
@@ -221,15 +225,17 @@
                 hls = null;
             }
 
+            const proxiedUrl = getProxyUrl(rawUrl);
+
             if (Hls.isSupported() && (currentTab === 'live' || rawUrl.endsWith('.m3u8'))) {
                 hls = new Hls();
-                hls.loadSource(rawUrl);
+                hls.loadSource(proxiedUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log("Play error:", e));
                 });
             } else {
-                video.src = rawUrl;
+                video.src = proxiedUrl;
                 video.play().catch(e => console.log("Play error:", e));
             }
         }
