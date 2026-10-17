@@ -127,7 +127,6 @@ const server = http.createServer((req, res) => {
                 if (ext === '.js') contentType = 'application/javascript';
                 else if (ext === '.css') contentType = 'text/css';
                 
-                res.writeHead(200, { 'Content-Type': 'text/plain' }); // או לטפל ב-HTML נכון
                 res.writeHead(200, { 'Content-Type': contentType });
                 res.end(content);
             }
