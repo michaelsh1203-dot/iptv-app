@@ -1,29 +1,30 @@
 const express = require('express');
+const https = require('https');
+const http = require('http');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static('public'));
 
-app.get('/proxy', async (req, res) => {
+app.get('/proxy', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
         return res.status(400).send('Missing URL parameter');
     }
 
-    try {
-        const response = await fetch(targetUrl);
-        const contentType = response.headers.get('content-type');
-        
+    const client = targetUrl.startsWith('https') ? https : http;
+
+    client.get(targetUrl, (proxyRes) => {
+        let contentType = proxyRes.headers['content-type'];
         if (contentType) {
             res.setHeader('content-type', contentType);
         }
-
-        const data = await response.text();
-        res.send(data);
-    } catch (err) {
+        res.writeHead(proxyRes.statusCode);
+        proxyRes.pipe(res);
+    }).on('error', (err) => {
         console.error('Proxy error:', err);
         res.status(500).send('Proxy error: ' + err.message);
-    }
+    });
 });
 
 app.listen(PORT, () => {
