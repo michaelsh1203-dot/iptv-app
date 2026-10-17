@@ -112,8 +112,9 @@
             initApp();
         }
 
+        // Using secure relative proxy path to avoid Mixed Content errors
         function getProxyUrl(targetUrl) {
-            return targetUrl;
+            return `/proxy?url=${encodeURIComponent(targetUrl)}`;
         }
 
         async function initApp() {
