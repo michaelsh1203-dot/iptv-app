@@ -112,7 +112,6 @@
             initApp();
         }
 
-        // Using secure relative proxy path to avoid Mixed Content errors
         function getProxyUrl(targetUrl) {
             return `/proxy?url=${encodeURIComponent(targetUrl)}`;
         }
@@ -210,22 +209,38 @@
 
             document.getElementById('current-title').textContent = title;
 
-            let rawUrl = currentTab === 'live' ? `${server}/live/${user}/${pass}/${streamId}.m3u8` :
-                         currentTab === 'movies' ? `${server}/movie/${user}/${pass}/${streamId}.${ext}` :
-                         `${server}/series/${user}/${pass}/${streamId}.${ext}`;
+            // עבור שידורים חיים ננסה גם פורמט TS ישיר וגם M3U8 במידת הצורך
+            let rawUrl = '';
+            if (currentTab === 'live') {
+                rawUrl = `${server}/live/${user}/${pass}/${streamId}.ts`;
+            } else if (currentTab === 'movies') {
+                rawUrl = `${server}/movie/${user}/${pass}/${streamId}.${ext || 'mp4'}`;
+            } else {
+                rawUrl = `${server}/series/${user}/${pass}/${streamId}.${ext || 'mp4'}`;
+            }
 
             const proxiedUrl = getProxyUrl(rawUrl);
             const video = document.getElementById('video-player');
 
-            if (Hls.isSupported() && (rawUrl.endsWith('.m3u8') || currentTab === 'live')) {
-                if (hls) hls.destroy();
-                hls = new Hls();
-                hls.loadSource(proxiedUrl);
+            if (hls) hls.destroy();
+
+            if (currentTab === 'live' && Hls.isSupported()) {
+                const m3u8Url = getProxyUrl(`${server}/live/${user}/${pass}/${streamId}.m3u8`);
+                hls = new Hls({
+                    p2pConfig: { live: true },
+                    xhrSetup: function (xhr, url) {
+                        // ודאות שהקריאה לענפי ה-M3U8 וה-TS תעבור דרך הפרוקסי
+                        if (!url.startsWith(window.location.origin) && !url.startsWith('/proxy')) {
+                            xhr.open('GET', getProxyUrl(url), true);
+                        }
+                    }
+                });
+                hls.loadSource(m3u8Url);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
             } else {
                 video.src = proxiedUrl;
-                video.play();
+                video.play().catch(() => {});
             }
         }
     </script>
