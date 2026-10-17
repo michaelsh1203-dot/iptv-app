@@ -12,43 +12,23 @@ app.use('/proxy', (req, res) => {
         return res.status(400).send('Missing target URL');
     }
 
-    // הגדרת CORS חופשי
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-
     const client = targetUrl.startsWith('https') ? https : http;
 
     const options = {
         headers: {
-            'User-Agent': 'IPTVSmarters/3.1.5 (iPad; iOS 16.0; Scale/2.00)',
-            'Accept': '*/*',
-            'Connection': 'keep-alive'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*'
         }
     };
 
     const proxyReq = client.get(targetUrl, options, (proxyRes) => {
-        // העברת כל הכותרות (Headers) שהתקבלו מספק ה-IPTV
-        res.status(proxyRes.statusCode);
-        Object.keys(proxyRes.headers).forEach((key) => {
-            res.setHeader(key, proxyRes.headers[key]);
-        });
-
-        // דריסת CORS למניעת חסימות דפדפן
-        res.setHeader('Access-Control-Allow-Origin', '*');
-
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
         proxyRes.pipe(res);
     });
 
     proxyReq.on('error', (err) => {
-        console.error('Proxy error:', err.message);
-        if (!res.headersSent) {
-            res.status(500).send('Proxy error: ' + err.message);
-        }
+        console.error('Proxy error:', err);
+        res.status(500).send('Proxy error');
     });
 });
 
