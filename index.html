@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPTV Player - Fullscreen Controls Auto-Hide</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        #player-container:fullscreen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+        }
+        #player-container:-webkit-full-screen {
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: none !important;
+            border-radius: 0 !important;
+        }
+        video::-webkit-media-controls-fullscreen-button {
+            display: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen flex overflow-hidden">
+
+    <!-- סרגל צד דינמי -->
+    <div class="w-96 bg-gray-800 border-r border-gray-700 flex flex-col h-full shadow-xl">
+        <div class="p-4 border-b border-gray-700 flex-shrink-0 space-y-3">
+            <div class="flex items-center justify-between">
+                <h1 class="text-xl font-bold" id="app-title">IPTV Player</h1>
+                <div class="flex space-x-1 space-x-reverse">
+                    <button id="restore-tiles-btn" class="hidden px-2 py-1 bg-yellow-600 hover:bg-yellow-500 rounded text-xs transition" title="ניהול והחזרת אריחים מוסתרים">🔄 אריחים</button>
+                    <button id="accounts-btn" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs transition" title="ניהול חשבונות">👤 חשבונות</button>
+                    <button id="back-btn" class="hidden px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs transition">⬅ חזרה</button>
+                </div>
+            </div>
+            <input type="text" id="search-input" placeholder="חיפוש..." class="w-full px-3 py-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
+        </div>
+
+        <div id="sidebar-content" class="flex-1 overflow-y-auto p-3">
+            <!-- תוכן דינמי -->
+        </div>
+    </div>
+
+    <!-- אזור הנגן הראשי ומדריך השידורים (EPG) -->
+    <div class="flex-1 flex flex-col items-center justify-center p-6 bg-gray-950 h-full overflow-y-auto">
+        <!-- מיכל הנגן מעטפת ראשית -->
+        <div id="player-container" class="w-full max-w-4xl bg-black rounded-lg overflow-hidden shadow-2xl relative aspect-video flex items-center justify-center flex-shrink-0">
+            <video id="videoPlayer" class="w-full h-full" controls playsinline></video>
+
+            <!-- מעטפת אחת משותפת לכל הכפתורים שמופיעה/נעלמת יחד -->
+            <div id="player-overlay-controls" class="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-300 z-[99999]">
+                <!-- כפתורי מעבר ערוצים בצדדים -->
+                <div class="absolute inset-x-6 top-1/2 -translate-y-1/2 flex justify-between">
+                    <button id="prev-channel-btn" class="pointer-events-auto bg-black/85 hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-bold shadow-2xl backdrop-blur transition flex items-center gap-1 border border-white/20">
+                        ⏭ ערוץ קודם
+                    </button>
+                    <button id="next-channel-btn" class="pointer-events-auto bg-black/85 hover:bg-blue-600 text-white px-5 py-3.5 rounded-xl text-base font-bold shadow-2xl backdrop-blur transition flex items-center gap-1 border border-white/20">
+                        ערוץ הבא ⏭
+                    </button>
+                </div>
+
+                <!-- כפתור מסך מלא בפינה השמאלית העליונה -->
+                <button id="custom-fullscreen-btn" class="absolute top-4 left-4 pointer-events-auto bg-black/85 hover:bg-blue-600 text-white px-3 py-2 rounded-lg shadow-2xl border border-white/20 text-xs font-bold flex items-center gap-1 cursor-pointer transition">
+                    ⛶ מסך מלא
+                </button>
+            </div>
+        </div>
+
+        <!-- כרטיס מדריך שידורים (EPG) תחת הנגן -->
+        <div id="epg-card" class="w-full max-w-4xl mt-4 bg-gray-900 border border-gray-800 rounded-lg p-4 shadow-lg">
+            <h2 id="epg-channel-name" class="text-lg font-bold text-blue-400 mb-2">בחר ערוץ לצפייה ולצפייה בלוח השידורים</h2>
+            <div id="epg-content" class="text-sm text-gray-300 space-y-1">
+                <p>מידע על מה שמשודר כרגע יופיע כאן...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const videoPlayer = document.getElementById('videoPlayer');
+        const playerContainer = document.getElementById('player-container');
+        const playerOverlayControls = document.getElementById('player-overlay-controls');
+        const customFullscreenBtn = document.getElementById('custom-fullscreen-btn');
+        const sidebarContent = document.getElementById('sidebar-content');
+        const searchInput = document.getElementById('search-input');
+        const backBtn = document.getElementById('back-btn');
+        const accountsBtn = document.getElementById('accounts-btn');
+        const restoreTilesBtn = document.getElementById('restore-tiles-btn');
+        const prevChannelBtn = document.getElementById('prev-channel-btn');
+        const nextChannelBtn = document.getElementById('next-channel-btn');
+        const epgCard = document.getElementById('epg-card');
+        const epgChannelNameEl = document.getElementById('epg-channel-name');
+        const epgContentEl = document.getElementById('epg-content');
+        const appTitle = document.getElementById('app-title');
+        
+        let allChannels = [];
+        let currentActiveList = []; 
+        let countriesMap = {}; 
+        let categoriesData = {}; 
+
+        let moviesCategories = [];
+        let moviesList = [];
+        let seriesCategories = [];
+        let seriesList = [];
+        
+        let currentSection = 'home'; 
+        let currentViewState = 'countries'; 
+        let selectedCountryName = null;
+        let selectedCategoryId = null;
+        let currentPlayingChannelId = null;
+
+        let hiddenTiles = JSON.parse(localStorage.getItem('iptv_hidden_tiles') || '{}');
+
+        let accounts = JSON.parse(localStorage.getItem('iptv_accounts') || '[]');
+        let activeAccount = JSON.parse(localStorage.getItem('iptv_active_account') || 'null');
+
+        if (accounts.length === 0) {
+            const defaultAcc = {
+                id: Date.now().toString(),
+                name: 'ספק ראשי',
+                serverUrl: 'http://tv.business-cloud-8.ru',
+                username: 'd48e6682bdb8',
+                password: 'a6af461b63'
+            };
+            accounts.push(defaultAcc);
+            activeAccount = defaultAcc;
+            localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
+            localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
+        } else if (!activeAccount) {
+            activeAccount = accounts[0];
+        }
+
+        let serverUrl = activeAccount ? activeAccount.serverUrl : '';
+        let username = activeAccount ? activeAccount.username : '';
+        let password = activeAccount ? activeAccount.password : '';
+
+        function getAccountHiddenKey() {
+            return activeAccount ? activeAccount.id : 'default';
+        }
+
+        async function initApp() {
+            if (!activeAccount) {
+                renderAccountsManager();
+                return;
+            }
+            serverUrl = activeAccount.serverUrl;
+            username = activeAccount.username;
+            password = activeAccount.password;
+            await loadData();
+        }
+
+        async function loadData() {
+            try {
+                sidebarContent.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm animate-pulse">טוען נתונים מהשרת...</div>';
+
+                const proxyBase = `http://${window.location.host}/proxy?url=`;
+
+                const catUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_live_categories`;
+                const catRes = await fetch(proxyBase + encodeURIComponent(catUrl));
+                let catData = await catRes.json();
+                if (typeof catData === 'string') catData = JSON.parse(catData);
+
+                countriesMap = {};
+                categoriesData = {};
+                if (Array.isArray(catData)) {
+                    catData.forEach(cat => {
+                        categoriesData[cat.category_id] = cat.category_name;
+                        let rawName = cat.category_name ? cat.category_name.trim() : '';
+                        let countryKey = cleanCountryName(rawName);
+
+                        if (!countriesMap[countryKey]) {
+                            countriesMap[countryKey] = [];
+                        }
+                        countriesMap[countryKey].push({
+                            id: cat.category_id,
+                            fullName: rawName
+                        });
+                    });
+                }
+
+                const streamsUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_live_streams`;
+                const streamsRes = await fetch(proxyBase + encodeURIComponent(streamsUrl));
+                let streamsData = await streamsRes.json();
+                if (typeof streamsData === 'string') streamsData = JSON.parse(streamsData);
+
+                if (Array.isArray(streamsData)) {
+                    allChannels = streamsData.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'he', { numeric: true }));
+                } else {
+                    allChannels = [];
+                }
+
+                try {
+                    const movCatUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_vod_categories`;
+                    const movCatRes = await fetch(proxyBase + encodeURIComponent(movCatUrl));
+                    moviesCategories = await movCatRes.json();
+
+                    const movUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_vod_streams`;
+                    const movRes = await fetch(proxyBase + encodeURIComponent(movUrl));
+                    moviesList = await movRes.json();
+                } catch (e) { moviesCategories = []; moviesList = []; }
+
+                try {
+                    const serCatUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_series_categories`;
+                    const serCatRes = await fetch(proxyBase + encodeURIComponent(serCatUrl));
+                    seriesCategories = await serCatRes.json();
+
+                    const serUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_series`;
+                    const serRes = await fetch(proxyBase + encodeURIComponent(serUrl));
+                    seriesList = await serRes.json();
+                } catch (e) { seriesCategories = []; seriesList = []; }
+
+                currentSection = 'home';
+                currentViewState = 'countries';
+                renderView();
+            } catch (err) {
+                console.error("שגיאה בטעינת נתונים:", err);
+                sidebarContent.innerHTML = `
+                    <div class="p-4 text-center text-red-400 text-sm space-y-2">
+                        <div>שגיאה בטעינת הערוצים מהשרת.</div>
+                        <div class="text-xs text-gray-400">${err.message}</div>
+                        <button onclick="renderAccountsManager()" class="px-3 py-1 bg-blue-600 text-white rounded text-xs mt-2">בדוק פרטי חשבון</button>
+                    </div>`;
+            }
+        }
+
+        function cleanCountryName(name) {
+            let cleaned = name
+                .replace(/\|.*$/, '')
+                .replace(/-.*/, '')
+                .replace(/\b(FHD|HD|SD|HEVC|4K|24\/7)\b/gi, '')
+                .trim();
+            return cleaned || name;
+        }
+
+        function renderView() {
+            const searchQuery = searchInput.value.trim().toLowerCase();
+
+            if (currentSection === 'accounts') {
+                renderAccountsManager();
+                return;
+            } else if (currentSection === 'hidden_tiles_manager') {
+                renderHiddenTilesManager();
+                return;
+            }
+
+            const accKey = getAccountHiddenKey();
+            const hasHidden = hiddenTiles[accKey] && hiddenTiles[accKey].length > 0;
+            if (hasHidden && currentSection !== 'home') {
+                restoreTilesBtn.classList.remove('hidden');
+            } else {
+                restoreTilesBtn.classList.add('hidden');
+            }
+
+            if (searchQuery.length > 0) {
+                backBtn.classList.remove('hidden');
+                searchInput.classList.remove('hidden');
+                if (currentSection === 'live') {
+                    const filtered = allChannels.filter(c => c.name.toLowerCase().includes(searchQuery));
+                    renderChannelsList(filtered, "תוצאות חיפוש");
+                } else if (currentSection === 'movies') {
+                    const filtered = (Array.isArray(moviesList) ? moviesList : []).filter(m => m.name.toLowerCase().includes(searchQuery));
+                    renderMoviesGrid(filtered, "תוצאות חיפוש סרטים");
+                } else if (currentSection === 'series') {
+                    const filtered = (Array.isArray(seriesList) ? seriesList : []).filter(s => s.name.toLowerCase().includes(searchQuery));
+                    renderSeriesGrid(filtered, "תוצאות חיפוש סדרות");
+                }
+                return;
+            }
+
+            if (currentSection === 'home') {
+                backBtn.classList.add('hidden');
+                searchInput.classList.add('hidden');
+                restoreTilesBtn.classList.add('hidden');
+                epgCard.style.display = 'block';
+                appTitle.textContent = `IPTV Player (${activeAccount ? activeAccount.name : ''})`;
+                renderHomeGrid();
+            } else if (currentSection === 'live') {
+                backBtn.classList.remove('hidden');
+                searchInput.classList.remove('hidden');
+                epgCard.style.display = 'block';
+                appTitle.textContent = 'Live TV';
+                if (currentViewState === 'channels') {
+                    const channels = allChannels.filter(c => c.category_id === selectedCategoryId);
+                    const title = categoriesData[selectedCategoryId] || 'ערוצים';
+                    renderChannelsList(channels, title);
+                } else if (currentViewState === 'providers') {
+                    renderProvidersGrid(selectedCountryName);
+                } else {
+                    renderCountriesGrid();
+                }
+            } else if (currentSection === 'movies') {
+                backBtn.classList.remove('hidden');
+                searchInput.classList.remove('hidden');
+                epgCard.style.display = 'none';
+                appTitle.textContent = 'סרטים (VOD)';
+                if (currentViewState === 'vod_items') {
+                    const movies = (Array.isArray(moviesList) ? moviesList : []).filter(m => m.category_id === selectedCategoryId);
+                    const cat = (Array.isArray(moviesCategories) ? moviesCategories : []).find(c => c.category_id === selectedCategoryId);
+                    renderMoviesGrid(movies, cat ? cat.category_name : 'סרטים');
+                } else {
+                    renderVodCategoriesGrid(moviesCategories, 'movies');
+                }
+            } else if (currentSection === 'series') {
+                backBtn.classList.remove('hidden');
+                searchInput.classList.remove('hidden');
+                epgCard.style.display = 'none';
+                appTitle.textContent = 'סדרות (VOD)';
+                if (currentViewState === 'episodes') {
+                    // פרקים
+                } else if (currentViewState === 'vod_items') {
+                    const series = (Array.isArray(seriesList) ? seriesList : []).filter(s => s.category_id === selectedCategoryId);
+                    const cat = (Array.isArray(seriesCategories) ? seriesCategories : []).find(c => c.category_id === selectedCategoryId);
+                    renderSeriesGrid(series, cat ? cat.category_name : 'סדרות');
+                } else {
+                    renderVodCategoriesGrid(seriesCategories, 'series');
+                }
+            }
+        }
+
+        function renderHomeGrid() {
+            sidebarContent.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-1 gap-4 p-2';
+
+            const items = [
+                { id: 'live', name: '📺 Live TV (שידורים חיים)', count: `${allChannels.length} ערוצים`, color: 'bg-blue-600 hover:bg-blue-500' },
+                { id: 'movies', name: '🎬 סרטים (Movies)', count: `${Array.isArray(moviesList) ? moviesList.length : 0} סרטים`, color: 'bg-purple-600 hover:bg-purple-500' },
+                { id: 'series', name: '🍿 סדרות (Series)', count: `${Array.isArray(seriesList) ? seriesList.length : 0} סדרות`, color: 'bg-emerald-600 hover:bg-emerald-500' }
+            ];
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = `${item.color} p-4 rounded-xl cursor-pointer transition flex flex-col justify-between h-28 shadow-lg text-right`;
+                
+                const title = document.createElement('span');
+                title.className = 'font-bold text-lg';
+                title.textContent = item.name;
+
+                const badge = document.createElement('span');
+                badge.className = 'text-xs text-white bg-black/30 px-2.5 py-1 rounded-md self-start';
+                badge.textContent = item.count;
+
+                card.appendChild(title);
+                card.appendChild(badge);
+
+                card.onclick = () => {
+                    currentSection = item.id;
+                    currentViewState = 'countries';
+                    renderView();
+                };
+
+                grid.appendChild(card);
+            });
+
+            sidebarContent.appendChild(grid);
+        }
+
+        function renderCountriesGrid() {
+            sidebarContent.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-2 gap-2';
+
+            const accKey = getAccountHiddenKey();
+            const hiddenList = (hiddenTiles[accKey] || []);
+
+            Object.keys(countriesMap).forEach(countryName => {
+                if (hiddenList.includes(`country_${countryName}`)) return;
+
+                const providers = countriesMap[countryName];
+                let totalChannels = 0;
+                providers.forEach(p => {
+                    totalChannels += allChannels.filter(c => c.category_id === p.id).length;
+                });
+
+                if (totalChannels === 0) return;
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700 hover:bg-blue-600 p-3 rounded-lg cursor-pointer transition flex flex-col justify-between h-24 shadow text-right relative group';
+                
+                const title = document.createElement('span');
+                title.className = 'font-bold text-sm line-clamp-2';
+                title.textContent = countryName;
+
+                const badge = document.createElement('span');
+                badge.className = 'text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded self-start';
+                badge.textContent = `${totalChannels} ערוצים`;
+
+                const hideBtn = document.createElement('button');
+                hideBtn.className = 'absolute top-1 left-1 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow';
+                hideBtn.title = 'הסתר אריח ותוכן';
+                hideBtn.innerHTML = '✕';
+                hideBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm(`האם להסתיר את המדינה "${countryName}" ואת כל הערוצים שבה?`)) {
+                        if (!hiddenTiles[accKey]) hiddenTiles[accKey] = [];
+                        hiddenTiles[accKey].push(`country_${countryName}`);
+                        localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
+                        renderCountriesGrid();
+                        renderView();
+                    }
+                };
+
+                card.appendChild(title);
+                card.appendChild(badge);
+                card.appendChild(hideBtn);
+
+                card.onclick = () => {
+                    selectedCountryName = countryName;
+                    if (providers.length === 1) {
+                        selectedCategoryId = providers[0].id;
+                        currentViewState = 'channels';
+                    } else {
+                        currentViewState = 'providers';
+                    }
+                    renderView();
+                };
+
+                grid.appendChild(card);
+            });
+
+            sidebarContent.appendChild(grid);
+        }
+
+        function renderProvidersGrid(countryName) {
+            sidebarContent.innerHTML = '';
+            const header = document.createElement('div');
+            header.className = 'text-sm font-semibold text-gray-400 mb-2 px-1';
+            header.textContent = `בחר ספק עבור: ${countryName}`;
+            sidebarContent.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.className = 'grid grid-cols-2 gap-2';
+
+            const accKey = getAccountHiddenKey();
+            const hiddenList = (hiddenTiles[accKey] || []);
+
+            const providers = countriesMap[countryName] || [];
+            providers.forEach(prov => {
+                if (hiddenList.includes(`prov_${prov.id}`)) return;
+
+                const count = allChannels.filter(c => c.category_id === prov.id).length;
+                if (count === 0) return;
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-700 hover:bg-purple-600 p-3 rounded-lg cursor-pointer transition flex flex-col justify-between h-24 shadow text-right relative group';
+                
+                const title = document.createElement('span');
+                title.className = 'font-bold text-sm line-clamp-2';
+                title.textContent = prov.fullName;
+
+                const badge = document.createElement('span');
+                badge.className = 'text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded self-start';
+                badge.textContent = `${count} ערוצים`;
+
+                const hideBtn = document.createElement('button');
+                hideBtn.className = 'absolute top-1 left-1 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow';
+                hideBtn.title = 'הסתר ספק ותוכן';
+                hideBtn.innerHTML = '✕';
+                hideBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm(`האם להסתיר את הספק "${prov.fullName}"?`)) {
+                        if (!hiddenTiles[accKey]) hiddenTiles[accKey] = [];
+                        hiddenTiles[accKey].push(`prov_${prov.id}`);
+                        localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
+                        renderProvidersGrid(countryName);
+                        renderView();
+                    }
+                };
+
+                card.appendChild(title);
+                card.appendChild(badge);
+                card.appendChild(hideBtn);
+
+                card.onclick = () => {
+                    selectedCategoryId = prov.id;
+                    currentViewState = 'channels';
+                    renderView();
+                };
+
+                grid.appendChild(card);
+            });
+
+            sidebarContent.appendChild(grid);
+        }
+
+        function renderChannelsList(channels, titleText) {
+            currentActiveList = channels; 
+            sidebarContent.innerHTML = '';
+            const header = document.createElement('div');
+            header.className = 'text-sm font-semibold text-gray-400 mb-2 px-1';
+            header.textContent = `${titleText} (${channels.length})`;
+            sidebarContent.appendChild(header);
+
+            const listContainer = document.createElement('div');
+            listContainer.className = 'space-y-1';
+
+            if (channels.length === 0) {
+                listContainer.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">אין ערוצים להצגה</div>';
+            } else {
+                channels.forEach(channel => {
+                    const streamUrl = `${serverUrl}/live/${username}/${password}/${channel.stream_id}.m3u8`;
+                    const isPlaying = (currentPlayingChannelId === channel.stream_id);
+
+                    const div = document.createElement('div');
+                    div.id = `channel-item-${channel.stream_id}`;
+                    div.className = `p-2 rounded cursor-pointer text-sm truncate transition flex items-center justify-between ${
+                        isPlaying 
+                        ? 'bg-blue-600 text-white font-bold shadow-lg ring-2 ring-blue-400' 
+                        : 'hover:bg-gray-700 text-gray-200'
+                    }`;
+
+                    div.innerHTML = `
+                        <span class="truncate">${channel.name}</span>
+                        ${isPlaying ? '<span class="text-xs mr-2 animate-pulse">▶ מנוגן</span>' : ''}
+                    `;
+
+                    div.onclick = () => playChannel(streamUrl, channel);
+                    listContainer.appendChild(div);
+                });
+            }
+
+            sidebarContent.appendChild(listContainer);
+        }
+
+        function playChannel(streamUrl, channel) {
+            currentPlayingChannelId = channel.stream_id;
+            epgChannelNameEl.textContent = channel.name;
+            
+            // ניתוב כתובת הניגון דרך הפרוקסי המקומי למניעת חסימות SSL בדפדפן במחשב
+            const proxiedStreamUrl = `http://${window.location.host}/proxy?url=${encodeURIComponent(streamUrl)}`;
+
+            if (currentActiveList) {
+                currentActiveList.forEach(c => {
+                    const el = document.getElementById(`channel-item-${c.stream_id}`);
+                    if (el) {
+                        if (c.stream_id === channel.stream_id) {
+                            el.className = 'p-2 rounded cursor-pointer text-sm truncate transition flex items-center justify-between bg-blue-600 text-white font-bold shadow-lg ring-2 ring-blue-400';
+                        } else {
+                            el.className = 'p-2 rounded cursor-pointer text-sm truncate transition flex items-center justify-between hover:bg-gray-700 text-gray-200';
+                        }
+                    }
+                });
+            }
+
+            if (Hls.isSupported()) {
+                if (window.hlsInstance) {
+                    window.hlsInstance.destroy();
+                }
+                const hls = new Hls();
+                window.hlsInstance = hls;
+                hls.loadSource(proxiedStreamUrl);
+                hls.attachMedia(videoPlayer);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    videoPlayer.play().catch(e => console.log("Auto-play blocked:", e));
+                });
+            } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+                videoPlayer.src = proxiedStreamUrl;
+                videoPlayer.addEventListener('loadedmetadata', () => {
+                    videoPlayer.play().catch(e => console.log("Auto-play blocked:", e));
+                });
+            }
+        }
+
+        customFullscreenBtn.onclick = () => {
+            if (!document.fullscreenElement) {
+                if (playerContainer.requestFullscreen) {
+                    playerContainer.requestFullscreen();
+                } else if (playerContainer.webkitRequestFullscreen) {
+                    playerContainer.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        };
+
+        let mouseTimer = null;
+        function showControls() {
+            playerOverlayControls.classList.remove('opacity-0');
+            playerOverlayControls.classList.add('opacity-100');
+
+            if (mouseTimer) clearTimeout(mouseTimer);
+            mouseTimer = setTimeout(() => {
+                playerOverlayControls.classList.remove('opacity-100');
+                playerOverlayControls.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        playerContainer.addEventListener('mousemove', showControls);
+        videoPlayer.addEventListener('mousemove', showControls);
+        
+        playerContainer.addEventListener('mouseleave', () => {
+            if (mouseTimer) clearTimeout(mouseTimer);
+            playerOverlayControls.classList.remove('opacity-100');
+            playerOverlayControls.classList.add('opacity-0');
+        });
+
+        function switchChannel(direction) {
+            if (!currentActiveList || currentActiveList.length === 0) return;
+
+            let currentIndex = currentActiveList.findIndex(c => c.stream_id === currentPlayingChannelId);
+            if (currentIndex === -1) {
+                currentIndex = 0;
+            } else {
+                if (direction === 'next') {
+                    currentIndex = (currentIndex + 1) % currentActiveList.length;
+                } else if (direction === 'prev') {
+                    currentIndex = (currentIndex - 1 + currentActiveList.length) % currentActiveList.length;
+                }
+            }
+
+            const targetChannel = currentActiveList[currentIndex];
+            if (targetChannel) {
+                const streamUrl = `${serverUrl}/live/${username}/${password}/${targetChannel.stream_id}.m3u8`;
+                playChannel(streamUrl, targetChannel);
+
+                const channelEl = document.getElementById(`channel-item-${targetChannel.stream_id}`);
+                if (channelEl) {
+                    channelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+
+        prevChannelBtn.onclick = () => switchChannel('prev');
+        nextChannelBtn.onclick = () => switchChannel('next');
+
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'INPUT') return; 
+            if (e.key === 'ArrowRight') switchChannel('next');
+            if (e.key === 'ArrowLeft') switchChannel('prev');
+        });
+
+        function renderAccountsManager() {
+            currentSection = 'accounts';
+            backBtn.classList.remove('hidden');
+            searchInput.classList.add('hidden');
+            restoreTilesBtn.classList.add('hidden');
+            epgCard.style.display = 'none';
+            appTitle.textContent = 'ניהול חשבונות';
+
+            sidebarContent.innerHTML = `
+                <div class="p-4 space-y-4">
+                    <div class="bg-gray-700 p-4 rounded-lg space-y-3">
+                        <h2 class="font-bold text-sm text-blue-300">הוסף חשבון חדש</h2>
+                        <input type="text" id="acc-name" placeholder="שם החשבון (לדוגמה: ספק משני)" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
+                        <input type="text" id="acc-url" placeholder="כתובת שרת (http://tv.example.com)" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
+                        <input type="text" id="acc-user" placeholder="שם משתמש" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
+                        <input type="password" id="acc-pass" placeholder="סיסמה" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
+                        <button onclick="saveNewAccount()" class="w-full py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-bold transition">הוסף ושמור חשבון</button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h2 class="font-bold text-sm text-gray-400">החשבונות שלך</h2>
+                        <div id="accounts-list" class="space-y-2"></div>
+                    </div>
+                </div>
+            `;
+
+            const listEl = document.getElementById('accounts-list');
+            accounts.forEach(acc => {
+                const isCurrent = activeAccount && activeAccount.id === acc.id;
+                const div = document.createElement('div');
+                div.className = `p-3 rounded-lg border flex items-center justify-between ${isCurrent ? 'bg-blue-900/40 border-blue-500' : 'bg-gray-800 border-gray-700'}`;
+                div.innerHTML = `
+                    <div>
+                        <div class="font-bold text-sm">${acc.name} ${isCurrent ? '<span class="text-xs text-blue-400">(פעיל)</span>' : ''}</div>
+                        <div class="text-xs text-gray-400 truncate max-w-[180px]">${acc.serverUrl}</div>
+                    </div>
+                    <div class="flex space-x-1 space-x-reverse">
+                        ${!isCurrent ? `<button onclick="switchAccount('${acc.id}')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs">בחר</button>` : ''}
+                        <button onclick="deleteAccount('${acc.id}')" class="px-2.5 py-1 bg-red-600 hover:bg-red-500 rounded text-xs">מחק</button>
+                    </div>
+                `;
+                listEl.appendChild(div);
+            });
+        }
+
+        window.saveNewAccount = function() {
+            const name = document.getElementById('acc-name').value.trim();
+            const serverUrl = document.getElementById('acc-url').value.trim();
+            const username = document.getElementById('acc-user').value.trim();
+            const password = document.getElementById('acc-pass').value.trim();
+
+            if (!serverUrl || !username || !password) {
+                alert('נא למלא לפחות את כתובת השרת, שם המשתמש והסיסמה.');
+                return;
+            }
+
+            const newAcc = {
+                id: Date.now().toString(),
+                name: name || 'חשבון נוסף',
+                serverUrl,
+                username,
+                password
+            };
+
+            accounts.push(newAcc);
+            activeAccount = newAcc;
+            localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
+            localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
+
+            initApp();
+        };
+
+        window.switchAccount = function(id) {
+            const acc = accounts.find(a => a.id === id);
+            if (acc) {
+                activeAccount = acc;
+                localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
+                initApp();
+            }
+        };
+
+        window.deleteAccount = function(id) {
+            if (accounts.length <= 1) {
+                alert('חייב להישאר לפחות חשבון אחד במערכת.');
+                return;
+            }
+            if (confirm('האם למחוק את החשבון לצמיתות?')) {
+                accounts = accounts.filter(a => a.id !== id);
+                localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
+                if (activeAccount && activeAccount.id === id) {
+                    activeAccount = accounts[0];
+                    localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
+                }
+                initApp();
+            }
+        };
+
+        backBtn.onclick = () => {
+            if (currentSection === 'accounts' || currentSection === 'hidden_tiles_manager') {
+                currentSection = 'home';
+                currentViewState = 'countries';
+            } else if (searchInput.value.trim().length > 0) {
+                searchInput.value = '';
+            } else if (currentViewState === 'channels') {
+                currentViewState = countriesMap[selectedCountryName] && countriesMap[selectedCountryName].length > 1 ? 'providers' : 'countries';
+            } else if (currentViewState === 'providers' || currentViewState === 'vod_items') {
+                currentViewState = 'countries';
+                currentSection = 'home';
+            } else {
+                currentSection = 'home';
+                currentViewState = 'countries';
+            }
+            renderView();
+        };
+
+        accountsBtn.onclick = () => {
+            renderAccountsManager();
+        };
+
+        restoreTilesBtn.onclick = () => {
+            const accKey = getAccountHiddenKey();
+            if (hiddenTiles[accKey]) {
+                delete hiddenTiles[accKey];
+                localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
+                renderView();
+                alert('כל האריחים המוסתרים הוחזרו בהצלחה!');
+            }
+        };
+
+        // הפעלת האפליקציה בטעינת העמוד
+        initApp();
+    </script>
+</body>
+</html>

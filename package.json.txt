@@ -1,0 +1,10 @@
+{
+  "name": "iptv-proxy",
+  "version": "1.0.0",
+  "description": "Secure IPTV Proxy Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
