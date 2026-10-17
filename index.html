@@ -141,6 +141,31 @@
             return activeAccount ? activeAccount.id : 'default';
         }
 
+        accountsBtn.onclick = () => {
+            renderAccountsManager();
+        };
+
+        backBtn.onclick = () => {
+            if (currentSection === 'accounts' || currentSection === 'hidden_tiles_manager') {
+                currentSection = 'home';
+                currentViewState = 'countries';
+            } else if (currentViewState === 'channels') {
+                if (countriesMap[selectedCountryName] && countriesMap[selectedCountryName].length > 1) {
+                    currentViewState = 'providers';
+                } else {
+                    currentViewState = 'countries';
+                }
+            } else if (currentViewState === 'providers') {
+                currentViewState = 'countries';
+            } else if (currentViewState === 'vod_items') {
+                currentViewState = 'categories';
+            } else {
+                currentSection = 'home';
+            }
+            searchInput.value = '';
+            renderView();
+        };
+
         async function initApp() {
             if (!activeAccount) {
                 renderAccountsManager();
@@ -156,7 +181,8 @@
             try {
                 sidebarContent.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm animate-pulse">טוען נתונים מהשרת...</div>';
 
-                const proxyBase = `http://${window.location.host}/proxy?token=my-super-secret-token-12345&url=`;
+                // פרוקסי נקי ובטוח ללא דרישת טוקן חיצוני
+                const proxyBase = `http://${window.location.host}/proxy?url=`;
 
                 const catUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_live_categories`;
                 const catRes = await fetch(proxyBase + encodeURIComponent(catUrl));
@@ -308,9 +334,7 @@
                 searchInput.classList.remove('hidden');
                 epgCard.style.display = 'none';
                 appTitle.textContent = 'סדרות (VOD)';
-                if (currentViewState === 'episodes') {
-                    // פרקים
-                } else if (currentViewState === 'vod_items') {
+                if (currentViewState === 'vod_items') {
                     const series = (Array.isArray(seriesList) ? seriesList : []).filter(s => s.category_id === selectedCategoryId);
                     const cat = (Array.isArray(seriesCategories) ? seriesCategories : []).find(c => c.category_id === selectedCategoryId);
                     renderSeriesGrid(series, cat ? cat.category_name : 'סדרות');
@@ -388,24 +412,8 @@
                 badge.className = 'text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded self-start';
                 badge.textContent = `${totalChannels} ערוצים`;
 
-                const hideBtn = document.createElement('button');
-                hideBtn.className = 'absolute top-1 left-1 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow';
-                hideBtn.title = 'הסתר אריח ותוכן';
-                hideBtn.innerHTML = '✕';
-                hideBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (confirm(`האם להסתיר את המדינה "${countryName}" ואת כל הערוצים שבה?`)) {
-                        if (!hiddenTiles[accKey]) hiddenTiles[accKey] = [];
-                        hiddenTiles[accKey].push(`country_${countryName}`);
-                        localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
-                        renderCountriesGrid();
-                        renderView();
-                    }
-                };
-
                 card.appendChild(title);
                 card.appendChild(badge);
-                card.appendChild(hideBtn);
 
                 card.onclick = () => {
                     selectedCountryName = countryName;
@@ -415,68 +423,6 @@
                     } else {
                         currentViewState = 'providers';
                     }
-                    renderView();
-                };
-
-                grid.appendChild(card);
-            });
-
-            sidebarContent.appendChild(grid);
-        }
-
-        function renderProvidersGrid(countryName) {
-            sidebarContent.innerHTML = '';
-            const header = document.createElement('div');
-            header.className = 'text-sm font-semibold text-gray-400 mb-2 px-1';
-            header.textContent = `בחר ספק עבור: ${countryName}`;
-            sidebarContent.appendChild(header);
-
-            const grid = document.createElement('div');
-            grid.className = 'grid grid-cols-2 gap-2';
-
-            const accKey = getAccountHiddenKey();
-            const hiddenList = (hiddenTiles[accKey] || []);
-
-            const providers = countriesMap[countryName] || [];
-            providers.forEach(prov => {
-                if (hiddenList.includes(`prov_${prov.id}`)) return;
-
-                const count = allChannels.filter(c => c.category_id === prov.id).length;
-                if (count === 0) return;
-
-                const card = document.createElement('div');
-                card.className = 'bg-gray-700 hover:bg-purple-600 p-3 rounded-lg cursor-pointer transition flex flex-col justify-between h-24 shadow text-right relative group';
-                
-                const title = document.createElement('span');
-                title.className = 'font-bold text-sm line-clamp-2';
-                title.textContent = prov.fullName;
-
-                const badge = document.createElement('span');
-                badge.className = 'text-xs text-gray-300 bg-gray-800 px-2 py-0.5 rounded self-start';
-                badge.textContent = `${count} ערוצים`;
-
-                const hideBtn = document.createElement('button');
-                hideBtn.className = 'absolute top-1 left-1 bg-red-600 hover:bg-red-500 text-white w-6 h-6 rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow';
-                hideBtn.title = 'הסתר ספק ותוכן';
-                hideBtn.innerHTML = '✕';
-                hideBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    if (confirm(`האם להסתיר את הספק "${prov.fullName}"?`)) {
-                        if (!hiddenTiles[accKey]) hiddenTiles[accKey] = [];
-                        hiddenTiles[accKey].push(`prov_${prov.id}`);
-                        localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
-                        renderProvidersGrid(countryName);
-                        renderView();
-                    }
-                };
-
-                card.appendChild(title);
-                card.appendChild(badge);
-                card.appendChild(hideBtn);
-
-                card.onclick = () => {
-                    selectedCategoryId = prov.id;
-                    currentViewState = 'channels';
                     renderView();
                 };
 
@@ -529,21 +475,7 @@
             currentPlayingChannelId = channel.stream_id;
             epgChannelNameEl.textContent = channel.name;
             
-            // ניתוב כתובת הניגון דרך הפרוקסי המקומי למניעת חסימות SSL בדפדפן במחשב
             const proxiedStreamUrl = `http://${window.location.host}/proxy?url=${encodeURIComponent(streamUrl)}`;
-
-            if (currentActiveList) {
-                currentActiveList.forEach(c => {
-                    const el = document.getElementById(`channel-item-${c.stream_id}`);
-                    if (el) {
-                        if (c.stream_id === channel.stream_id) {
-                            el.className = 'p-2 rounded cursor-pointer text-sm truncate transition flex items-center justify-between bg-blue-600 text-white font-bold shadow-lg ring-2 ring-blue-400';
-                        } else {
-                            el.className = 'p-2 rounded cursor-pointer text-sm truncate transition flex items-center justify-between hover:bg-gray-700 text-gray-200';
-                        }
-                    }
-                });
-            }
 
             if (Hls.isSupported()) {
                 if (window.hlsInstance) {
@@ -564,76 +496,6 @@
             }
         }
 
-        customFullscreenBtn.onclick = () => {
-            if (!document.fullscreenElement) {
-                if (playerContainer.requestFullscreen) {
-                    playerContainer.requestFullscreen();
-                } else if (playerContainer.webkitRequestFullscreen) {
-                    playerContainer.webkitRequestFullscreen();
-                }
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
-            }
-        };
-
-        let mouseTimer = null;
-        function showControls() {
-            playerOverlayControls.classList.remove('opacity-0');
-            playerOverlayControls.classList.add('opacity-100');
-
-            if (mouseTimer) clearTimeout(mouseTimer);
-            mouseTimer = setTimeout(() => {
-                playerOverlayControls.classList.remove('opacity-100');
-                playerOverlayControls.classList.add('opacity-0');
-            }, 3000);
-        }
-
-        playerContainer.addEventListener('mousemove', showControls);
-        videoPlayer.addEventListener('mousemove', showControls);
-        
-        playerContainer.addEventListener('mouseleave', () => {
-            if (mouseTimer) clearTimeout(mouseTimer);
-            playerOverlayControls.classList.remove('opacity-100');
-            playerOverlayControls.classList.add('opacity-0');
-        });
-
-        function switchChannel(direction) {
-            if (!currentActiveList || currentActiveList.length === 0) return;
-
-            let currentIndex = currentActiveList.findIndex(c => c.stream_id === currentPlayingChannelId);
-            if (currentIndex === -1) {
-                currentIndex = 0;
-            } else {
-                if (direction === 'next') {
-                    currentIndex = (currentIndex + 1) % currentActiveList.length;
-                } else if (direction === 'prev') {
-                    currentIndex = (currentIndex - 1 + currentActiveList.length) % currentActiveList.length;
-                }
-            }
-
-            const targetChannel = currentActiveList[currentIndex];
-            if (targetChannel) {
-                const streamUrl = `${serverUrl}/live/${username}/${password}/${targetChannel.stream_id}.m3u8`;
-                playChannel(streamUrl, targetChannel);
-
-                const channelEl = document.getElementById(`channel-item-${targetChannel.stream_id}`);
-                if (channelEl) {
-                    channelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            }
-        }
-
-        prevChannelBtn.onclick = () => switchChannel('prev');
-        nextChannelBtn.onclick = () => switchChannel('next');
-
-        document.addEventListener('keydown', (e) => {
-            if (document.activeElement.tagName === 'INPUT') return; 
-            if (e.key === 'ArrowRight') switchChannel('next');
-            if (e.key === 'ArrowLeft') switchChannel('prev');
-        });
-
         function renderAccountsManager() {
             currentSection = 'accounts';
             backBtn.classList.remove('hidden');
@@ -642,67 +504,63 @@
             epgCard.style.display = 'none';
             appTitle.textContent = 'ניהול חשבונות';
 
+            let accountsHtml = accounts.map(acc => `
+                <div class="bg-gray-800 p-3 rounded-lg flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-sm ${acc.id === (activeAccount ? activeAccount.id : '') ? 'text-green-400' : 'text-white'}">
+                            ${acc.name} ${acc.id === (activeAccount ? activeAccount.id : '') ? '(פעיל)' : ''}
+                        </div>
+                        <div class="text-xs text-gray-400">${acc.serverUrl}</div>
+                    </div>
+                    <div class="flex space-x-2 space-x-reverse">
+                        ${acc.id !== (activeAccount ? activeAccount.id : '') ? `<button onclick="switchAccount('${acc.id}')" class="px-2 py-1 bg-blue-600 text-white rounded text-xs">הפעל</button>` : ''}
+                        <button onclick="deleteAccount('${acc.id}')" class="px-2 py-1 bg-red-600 text-white rounded text-xs">מחק</button>
+                    </div>
+                </div>
+            `).join('');
+
             sidebarContent.innerHTML = `
                 <div class="p-4 space-y-4">
                     <div class="bg-gray-700 p-4 rounded-lg space-y-3">
                         <h2 class="font-bold text-sm text-blue-300">הוסף חשבון חדש</h2>
-                        <input type="text" id="acc-name" placeholder="שם החשבון (לדוגמה: ספק משני)" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
+                        <input type="text" id="acc-name" placeholder="שם החשבון (לדוגמה: ספק ראשי)" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
                         <input type="text" id="acc-url" placeholder="כתובת שרת (http://tv.example.com)" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
                         <input type="text" id="acc-user" placeholder="שם משתמש" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
                         <input type="password" id="acc-pass" placeholder="סיסמה" class="w-full px-3 py-2 bg-gray-800 rounded text-sm text-white">
-                        <button onclick="saveNewAccount()" class="w-full py-2 bg-green-600 hover:bg-green-500 rounded text-sm font-bold transition">הוסף ושמור חשבון</button>
+                        <button onclick="saveNewAccount()" class="w-full py-2 bg-green-600 hover:bg-green-500 text-white font-bold rounded text-sm transition">הוסף ושמור חשבון</button>
                     </div>
-
                     <div class="space-y-2">
-                        <h2 class="font-bold text-sm text-gray-400">החשבונות שלך</h2>
-                        <div id="accounts-list" class="space-y-2"></div>
+                        <h2 class="font-bold text-sm text-gray-300">החשבונות שלי</h2>
+                        ${accountsHtml}
                     </div>
                 </div>
             `;
-
-            const listEl = document.getElementById('accounts-list');
-            accounts.forEach(acc => {
-                const isCurrent = activeAccount && activeAccount.id === acc.id;
-                const div = document.createElement('div');
-                div.className = `p-3 rounded-lg border flex items-center justify-between ${isCurrent ? 'bg-blue-900/40 border-blue-500' : 'bg-gray-800 border-gray-700'}`;
-                div.innerHTML = `
-                    <div>
-                        <div class="font-bold text-sm">${acc.name} ${isCurrent ? '<span class="text-xs text-blue-400">(פעיל)</span>' : ''}</div>
-                        <div class="text-xs text-gray-400 truncate max-w-[180px]">${acc.serverUrl}</div>
-                    </div>
-                    <div class="flex space-x-1 space-x-reverse">
-                        ${!isCurrent ? `<button onclick="switchAccount('${acc.id}')" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs">בחר</button>` : ''}
-                        <button onclick="deleteAccount('${acc.id}')" class="px-2.5 py-1 bg-red-600 hover:bg-red-500 rounded text-xs">מחק</button>
-                    </div>
-                `;
-                listEl.appendChild(div);
-            });
         }
 
         window.saveNewAccount = function() {
             const name = document.getElementById('acc-name').value.trim();
-            const serverUrl = document.getElementById('acc-url').value.trim();
-            const username = document.getElementById('acc-user').value.trim();
-            const password = document.getElementById('acc-pass').value.trim();
+            const url = document.getElementById('acc-url').value.trim();
+            const user = document.getElementById('acc-user').value.trim();
+            const pass = document.getElementById('acc-pass').value.trim();
 
-            if (!serverUrl || !username || !password) {
-                alert('נא למלא לפחות את כתובת השרת, שם המשתמש והסיסמה.');
+            if (!url || !user || !pass) {
+                alert('נא למלא לפחות כתובת שרת, שם משתמש וסיסמה.');
                 return;
             }
 
             const newAcc = {
                 id: Date.now().toString(),
-                name: name || 'חשבון נוסף',
-                serverUrl,
-                username,
-                password
+                name: name || 'ספק נוסף',
+                serverUrl: url.replace(/\/$/, ''),
+                username: user,
+                password: pass
             };
 
             accounts.push(newAcc);
             activeAccount = newAcc;
             localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
             localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
-
+            
             initApp();
         };
 
@@ -720,50 +578,16 @@
                 alert('חייב להישאר לפחות חשבון אחד במערכת.');
                 return;
             }
-            if (confirm('האם למחוק את החשבון לצמיתות?')) {
-                accounts = accounts.filter(a => a.id !== id);
-                localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
-                if (activeAccount && activeAccount.id === id) {
-                    activeAccount = accounts[0];
-                    localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
-                }
-                initApp();
+            accounts = accounts.filter(a => a.id !== id);
+            localStorage.setItem('iptv_accounts', JSON.stringify(accounts));
+            if (activeAccount && activeAccount.id === id) {
+                activeAccount = accounts[0];
+                localStorage.setItem('iptv_active_account', JSON.stringify(activeAccount));
             }
-        };
-
-        backBtn.onclick = () => {
-            if (currentSection === 'accounts' || currentSection === 'hidden_tiles_manager') {
-                currentSection = 'home';
-                currentViewState = 'countries';
-            } else if (searchInput.value.trim().length > 0) {
-                searchInput.value = '';
-            } else if (currentViewState === 'channels') {
-                currentViewState = countriesMap[selectedCountryName] && countriesMap[selectedCountryName].length > 1 ? 'providers' : 'countries';
-            } else if (currentViewState === 'providers' || currentViewState === 'vod_items') {
-                currentViewState = 'countries';
-                currentSection = 'home';
-            } else {
-                currentSection = 'home';
-                currentViewState = 'countries';
-            }
-            renderView();
-        };
-
-        accountsBtn.onclick = () => {
             renderAccountsManager();
         };
 
-        restoreTilesBtn.onclick = () => {
-            const accKey = getAccountHiddenKey();
-            if (hiddenTiles[accKey]) {
-                delete hiddenTiles[accKey];
-                localStorage.setItem('iptv_hidden_tiles', JSON.stringify(hiddenTiles));
-                renderView();
-                alert('כל האריחים המוסתרים הוחזרו בהצלחה!');
-            }
-        };
-
-        // הפעלת האפליקציה בטעינת העמוד
+        // הפעלה ראשונית של האפליקציה בטעינה
         initApp();
     </script>
 </body>
