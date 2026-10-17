@@ -181,7 +181,6 @@
             try {
                 sidebarContent.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm animate-pulse">טוען נתונים מהשרת...</div>';
 
-                // פרוקסי נקי ובטוח ללא דרישת טוקן חיצוני
                 const proxyBase = `http://${window.location.host}/proxy?url=`;
 
                 const catUrl = `${serverUrl}/player_api.php?username=${username}&password=${password}&action=get_live_categories`;
@@ -587,7 +586,6 @@
             renderAccountsManager();
         };
 
-        // הפעלה ראשונית של האפליקציה בטעינה
         initApp();
     </script>
 </body>
