@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player - Fullscreen Controls</title>
+    <title>IPTV Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
@@ -225,24 +225,17 @@
                 hls = null;
             }
 
+            const proxiedUrl = getProxyUrl(rawUrl);
+
             if (Hls.isSupported() && (currentTab === 'live' || rawUrl.endsWith('.m3u8'))) {
-                hls = new Hls({
-                    xhrSetup: function (xhr, url) {
-                        // העברת כל בקשות ה־HLS דרך הפרוקסי של השרת למניעת שגיאת Mixed Content
-                        const fullUrl = url.startsWith('http') ? url : new URL(url, rawUrl).href;
-                        xhr.open('GET', getProxyUrl(fullUrl), true);
-                    }
-                });
-                hls.loadSource(getProxyUrl(rawUrl));
+                hls = new Hls();
+                hls.loadSource(proxiedUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log("Play error:", e));
                 });
-                hls.on(Hls.Events.ERROR, (event, data) => {
-                    console.error('HLS error details:', data);
-                });
             } else {
-                video.src = getProxyUrl(rawUrl);
+                video.src = proxiedUrl;
                 video.play().catch(e => console.log("Play error:", e));
             }
         }
