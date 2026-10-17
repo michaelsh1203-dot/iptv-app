@@ -209,6 +209,7 @@
 
             document.getElementById('current-title').textContent = title;
 
+            // שימוש בכתובת המקורית של השרת לניגון (עוקף את הפרוקסי עבור הווידאו)
             let rawUrl = '';
             if (currentTab === 'live') {
                 rawUrl = `${server}/live/${user}/${pass}/${streamId}.m3u8`;
@@ -225,17 +226,18 @@
                 hls = null;
             }
 
-            const proxiedUrl = getProxyUrl(rawUrl);
-
             if (Hls.isSupported() && (currentTab === 'live' || rawUrl.endsWith('.m3u8'))) {
                 hls = new Hls();
-                hls.loadSource(proxiedUrl);
+                hls.loadSource(rawUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log("Play error:", e));
                 });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS error details:', data);
+                });
             } else {
-                video.src = proxiedUrl;
+                video.src = rawUrl;
                 video.play().catch(e => console.log("Play error:", e));
             }
         }
