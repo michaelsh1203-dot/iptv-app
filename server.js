@@ -18,19 +18,21 @@ app.use('/proxy', (req, res) => {
         headers: {
             'User-Agent': 'IPTVSmartersPro',
             'Accept': '*/*',
-            'Connection': 'keep-alive',
-            'Cache-Control': 'no-cache'
+            'Connection': 'keep-alive'
         }
     };
 
     const proxyReq = client.get(targetUrl, options, (proxyRes) => {
+        if (proxyRes.statusCode === 511) {
+            console.error('Upstream returned 511 for URL:', targetUrl);
+        }
         res.writeHead(proxyRes.statusCode, proxyRes.headers);
         proxyRes.pipe(res);
     });
 
     proxyReq.on('error', (err) => {
-        console.error('Proxy error:', err);
-        res.status(500).send('Proxy error');
+        console.error('Proxy error:', err.message);
+        res.status(500).send('Proxy error: ' + err.message);
     });
 });
 
