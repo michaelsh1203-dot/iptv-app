@@ -2,64 +2,88 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPTV Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>IPTV Player - Direct Stream</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body { background-color: #0b0f19; color: #f8fafc; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
     </style>
 </head>
 <body class="h-screen flex flex-col font-sans overflow-hidden">
 
     <!-- Header -->
-    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 p-4 flex justify-between items-center shadow-lg z-10">
-        <h1 class="text-xl font-bold text-cyan-400">IPTV Player</h1>
-        <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2 rounded-xl text-sm font-semibold transition shadow-md shadow-cyan-900/50">
-            👤 חשבונות
-        </button>
+    <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-3 sm:p-4 flex justify-between items-center shadow-lg z-20 flex-shrink-0">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <span class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">IPTV Player</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hidden sm:inline-block">חיבור ישיר</span>
+        </div>
+        <div class="flex items-center space-x-2 space-x-reverse">
+            <button onclick="toggleMobileSidebar()" class="md:hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition">
+                📺 ערוצים
+            </button>
+            <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shadow-md shadow-cyan-900/50 flex items-center gap-1.5">
+                <span>⚙️ הגדרות</span>
+            </button>
+        </div>
     </header>
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex overflow-hidden">
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
         <!-- Sidebar: Categories & Streams -->
-        <aside class="w-1/3 max-w-sm bg-slate-900/90 border-l border-slate-800 flex flex-col">
-            <div class="flex border-b border-slate-800 text-sm font-medium">
+        <aside id="sidebar" class="w-full md:w-80 lg:w-96 bg-slate-900/95 md:bg-slate-900/90 border-b md:border-b-0 md:border-l border-slate-800 flex flex-col flex-shrink-0 absolute md:relative inset-0 z-10 transition-transform duration-300 md:translate-x-0 hidden md:flex">
+            <!-- טאבים ראשיים -->
+            <div class="flex border-b border-slate-800 text-sm font-medium flex-shrink-0">
                 <button id="tab-live" onclick="switchTab('live')" class="flex-1 py-3 text-center border-b-2 border-cyan-500 text-cyan-400 font-bold transition">Live TV</button>
                 <button id="tab-movies" onclick="switchTab('movies')" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">סרטים</button>
                 <button id="tab-series" onclick="switchTab('series')" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">סדרות</button>
             </div>
 
-            <div class="p-3 border-b border-slate-800">
-                <select id="category-select" onchange="filterChannels()" class="w-full bg-slate-800 border border-slate-700 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500">
+            <!-- חיפוש וסינון קטגוריות -->
+            <div class="p-3 border-b border-slate-800 space-y-2 flex-shrink-0">
+                <input type="text" id="search-input" oninput="filterChannels()" placeholder="🔍 חיפוש ערוץ או תוכן..." class="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-cyan-500">
+                <select id="category-select" onchange="filterChannels()" class="w-full bg-slate-800 border border-slate-700 text-white p-2 rounded-xl text-sm focus:outline-none focus:border-cyan-500">
                     <option value="all">כל הקטגוריות</option>
                 </select>
             </div>
 
-            <!-- Grid of Channels -->
-            <div id="items-list" class="flex-1 overflow-y-auto p-3 grid grid-cols-1 gap-2">
-                <div class="text-center text-slate-500 py-10 col-span-full">טוען נתונים...</div>
+            <!-- רשימת הערוצים -->
+            <div id="items-list" class="flex-1 overflow-y-auto p-3 space-y-1.5">
+                <div class="text-center text-slate-500 py-10">טוען נתונים...</div>
             </div>
         </aside>
 
         <!-- Video Player Display -->
-        <main class="flex-1 flex flex-col bg-slate-950 justify-center items-center relative p-6">
-            <div class="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center">
-                <video id="video-player" controls autoplay class="w-full h-full object-contain"></video>
+        <main class="flex-1 flex flex-col bg-slate-950 justify-center items-center relative p-2 sm:p-6 overflow-hidden">
+            <div class="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80 relative flex items-center justify-center">
+                <video id="video-player" playsinline controls autoplay class="w-full h-full object-contain"></video>
+                <div id="player-status" class="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-xl text-xs text-slate-300 pointer-events-none transition-opacity duration-300 opacity-0"></div>
             </div>
-            <div id="current-title" class="mt-4 text-lg font-bold text-slate-200 tracking-wide">בחר ערוץ לצפייה</div>
+            
+            <div class="w-full max-w-5xl mt-3 flex items-center justify-between px-2">
+                <div>
+                    <h2 id="current-title" class="text-base sm:text-lg font-bold text-slate-200 tracking-wide truncate">בחר ערוץ לצפייה</h2>
+                    <span id="current-mode" class="text-xs text-slate-500">חיבור ישיר מהמכשיר</span>
+                </div>
+            </div>
         </main>
     </div>
 
     <!-- Modal settings -->
-    <div id="account-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50">
-        <div class="bg-slate-900 p-6 rounded-2xl w-96 border border-slate-800 shadow-2xl">
-            <h2 class="text-lg font-bold mb-4 text-white">הגדרות חשבון IPTV</h2>
+    <div id="account-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-slate-900 p-6 rounded-2xl w-full max-w-md border border-slate-800 shadow-2xl">
+            <h2 class="text-lg font-bold mb-4 text-white flex items-center gap-2">
+                <span>📡 הגדרות שרת IPTV</span>
+            </h2>
             <div class="space-y-3">
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">כתובת שרת (Server URL)</label>
-                    <input type="text" id="cfg-server" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <input type="text" id="cfg-server" placeholder="http://tv.business-cloud-8.ru" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-slate-400 mb-1">שם משתמש (Username)</label>
@@ -92,12 +116,17 @@
             document.getElementById('cfg-user').value = user;
             document.getElementById('cfg-pass').value = pass;
 
-            if (user && pass) {
+            if (server && user && pass) {
                 initApp();
             } else {
                 openModal();
             }
         });
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('hidden');
+        }
 
         function openModal() { document.getElementById('account-modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('account-modal').classList.add('hidden'); }
@@ -112,8 +141,12 @@
             initApp();
         }
 
-        function getProxyUrl(targetUrl) {
-            return `/proxy?url=${encodeURIComponent(targetUrl)}`;
+        function showStatus(msg) {
+            const el = document.getElementById('player-status');
+            el.textContent = msg;
+            el.classList.remove('opacity-0');
+            clearTimeout(window.statusTimer);
+            window.statusTimer = setTimeout(() => el.classList.add('opacity-0'), 5000);
         }
 
         async function initApp() {
@@ -121,24 +154,26 @@
             const user = localStorage.getItem('iptv_user');
             const pass = localStorage.getItem('iptv_pass');
 
-            if (!user || !pass) return;
+            if (!server || !user || !pass) return;
 
-            document.getElementById('items-list').innerHTML = '<div class="text-center text-slate-400 py-10 col-span-full">טוען ערוצים ואריחים...</div>';
+            document.getElementById('items-list').innerHTML = '<div class="text-center text-slate-400 py-10">טוען נתונים מהשרת...</div>';
 
             try {
                 let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
-                const catRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`));
+                
+                // טעינת קטגוריות ורשימה דרך הפרוקסי בלבד (כדי לא להיתקל ב-CORS ברשימות)
+                const catRes = await fetch(`/proxy?url=${encodeURIComponent(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`)}`);
                 categories = await catRes.json();
                 populateCategories();
 
                 let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
-                const streamRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`));
+                const streamRes = await fetch(`/proxy?url=${encodeURIComponent(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`)}`);
                 streams = await streamRes.json();
 
                 renderStreams(streams);
             } catch (err) {
                 console.error('Error:', err);
-                document.getElementById('items-list').innerHTML = '<div class="text-center text-red-400 py-10 col-span-full">שגיאה בטעינת נתונים מהשרת</div>';
+                document.getElementById('items-list').innerHTML = '<div class="text-center text-red-400 py-10">שגיאה בטעינת נתונים. בדוק הגדרות.</div>';
             }
         }
 
@@ -160,33 +195,50 @@
             container.innerHTML = '';
 
             if (!Array.isArray(items) || items.length === 0) {
-                container.innerHTML = '<div class="text-center text-slate-500 py-10 col-span-full">לא נמצאו פריטים</div>';
+                container.innerHTML = '<div class="text-center text-slate-500 py-10">לא נמצאו פריטים</div>';
                 return;
             }
 
+            const frag = document.createDocumentFragment();
+
             items.forEach(item => {
                 const card = document.createElement('div');
-                card.className = 'bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 p-3 rounded-2xl cursor-pointer transition shadow-md flex items-center justify-between group';
+                card.className = 'bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 p-2.5 rounded-xl cursor-pointer transition shadow flex items-center justify-between group';
                 
                 const title = item.name || item.title || 'ערוץ';
                 const streamId = item.stream_id || item.series_id;
                 const ext = item.container_extension || 'mp4';
 
-                card.innerHTML = `<span class="truncate text-sm font-semibold text-slate-200 group-hover:text-cyan-400 transition">${title}</span>
-                                  <span class="text-xs bg-slate-900 text-slate-400 px-2 py-1 rounded-lg">▶ צפה</span>`;
+                card.innerHTML = `<span class="truncate text-xs sm:text-sm font-medium text-slate-200 group-hover:text-cyan-400 transition ml-2">${title}</span>
+                                  <span class="text-[11px] bg-slate-900 text-slate-400 px-2 py-1 rounded-lg flex-shrink-0 group-hover:bg-cyan-950 group-hover:text-cyan-300">▶ נגן</span>`;
                 
-                card.onclick = () => playStream(streamId, title, ext);
-                container.appendChild(card);
+                card.onclick = () => {
+                    if (window.innerWidth < 768) {
+                        document.getElementById('sidebar').classList.add('hidden');
+                    }
+                    playStream(streamId, title, ext);
+                };
+                frag.appendChild(card);
             });
+
+            container.appendChild(frag);
         }
 
         function filterChannels() {
             const catId = document.getElementById('category-select').value;
-            if (catId === 'all') {
-                renderStreams(streams);
-            } else {
-                renderStreams(streams.filter(s => s.category_id === catId));
+            const search = (document.getElementById('search-input').value || '').trim().toLowerCase();
+
+            let filtered = streams;
+            if (catId !== 'all') {
+                filtered = filtered.filter(s => String(s.category_id) === String(catId));
             }
+            if (search) {
+                filtered = filtered.filter(s => {
+                    const name = (s.name || s.title || '').toLowerCase();
+                    return name.includes(search);
+                });
+            }
+            renderStreams(filtered);
         }
 
         function switchTab(tab) {
@@ -199,6 +251,7 @@
                     btn.className = 'flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition';
                 }
             });
+            document.getElementById('search-input').value = '';
             initApp();
         }
 
@@ -209,6 +262,7 @@
 
             document.getElementById('current-title').textContent = title;
 
+            // יצירת קישור ישיר לשרת ה-IPTV המקורי (ללא /proxy)
             let rawUrl = '';
             if (currentTab === 'live') {
                 rawUrl = `${server}/live/${user}/${pass}/${streamId}.m3u8`;
@@ -225,18 +279,34 @@
                 hls = null;
             }
 
-            const proxiedUrl = getProxyUrl(rawUrl);
+            showStatus(`מנסה חיבור ישיר ל-${title}...`);
 
-            if (Hls.isSupported() && rawUrl.includes('.m3u8')) {
-                hls = new Hls();
-                hls.loadSource(proxiedUrl);
+            const isHlsStream = rawUrl.includes('.m3u8');
+
+            if (isHlsStream && Hls.isSupported()) {
+                hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: true
+                });
+
+                hls.loadSource(rawUrl);
                 hls.attachMedia(video);
+
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    video.play().catch(e => console.log("Play error:", e));
+                    video.play().catch(e => console.log('Autoplay blocked:', e));
+                    showStatus('מנגן בחיבור ישיר!');
+                });
+
+                hls.on(Hls.Events.ERROR, function(event, data) {
+                    if (data.fatal) {
+                        console.warn('Direct stream error:', data.details);
+                        showStatus('שגיאה בחיבור ישיר. ייתכן שהדפדפן חוסם תוכן לא מאובטח (HTTP).');
+                    }
                 });
             } else {
-                video.src = proxiedUrl;
-                video.play().catch(e => console.log("Play error:", e));
+                video.src = rawUrl;
+                video.play().catch(e => console.log('Play error:', e));
+                showStatus('טוען נגן...');
             }
         }
     </script>
