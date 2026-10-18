@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>IPTV Player - Direct Stream</title>
+    <title>IPTV Player</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
@@ -20,7 +20,7 @@
     <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-3 sm:p-4 flex justify-between items-center shadow-lg z-20 flex-shrink-0">
         <div class="flex items-center space-x-3 space-x-reverse">
             <span class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">IPTV Player</span>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hidden sm:inline-block">חיבור ישיר</span>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hidden sm:inline-block">מצב פרוקסי מאובטח</span>
         </div>
         <div class="flex items-center space-x-2 space-x-reverse">
             <button onclick="toggleMobileSidebar()" class="md:hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition">
@@ -68,7 +68,7 @@
             <div class="w-full max-w-5xl mt-3 flex items-center justify-between px-2">
                 <div>
                     <h2 id="current-title" class="text-base sm:text-lg font-bold text-slate-200 tracking-wide truncate">בחר ערוץ לצפייה</h2>
-                    <span id="current-mode" class="text-xs text-slate-500">חיבור ישיר מהמכשיר</span>
+                    <span id="current-mode" class="text-xs text-slate-500">מוכן לשידור</span>
                 </div>
             </div>
         </main>
@@ -141,6 +141,10 @@
             initApp();
         }
 
+        function getProxyUrl(targetUrl) {
+            return `/proxy?url=${encodeURIComponent(targetUrl)}`;
+        }
+
         function showStatus(msg) {
             const el = document.getElementById('player-status');
             el.textContent = msg;
@@ -160,14 +164,12 @@
 
             try {
                 let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
-                
-                // טעינת קטגוריות ורשימה דרך הפרוקסי בלבד (כדי לא להיתקל ב-CORS ברשימות)
-                const catRes = await fetch(`/proxy?url=${encodeURIComponent(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`)}`);
+                const catRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`));
                 categories = await catRes.json();
                 populateCategories();
 
                 let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
-                const streamRes = await fetch(`/proxy?url=${encodeURIComponent(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`)}`);
+                const streamRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`));
                 streams = await streamRes.json();
 
                 renderStreams(streams);
@@ -262,7 +264,6 @@
 
             document.getElementById('current-title').textContent = title;
 
-            // יצירת קישור ישיר לשרת ה-IPTV המקורי (ללא /proxy)
             let rawUrl = '';
             if (currentTab === 'live') {
                 rawUrl = `${server}/live/${user}/${pass}/${streamId}.m3u8`;
@@ -279,7 +280,10 @@
                 hls = null;
             }
 
-            showStatus(`מנסה חיבור ישיר ל-${title}...`);
+            const proxiedUrl = getProxyUrl(rawUrl);
+            document.getElementById('current-mode').textContent = 'מנגן דרך פרוקסי מאובטח';
+
+            showStatus(`מתחבר ל-${title}...`);
 
             const isHlsStream = rawUrl.includes('.m3u8');
 
@@ -289,22 +293,22 @@
                     lowLatencyMode: true
                 });
 
-                hls.loadSource(rawUrl);
+                hls.loadSource(proxiedUrl);
                 hls.attachMedia(video);
 
                 hls.on(Hls.Events.MANIFEST_PARSED, function() {
                     video.play().catch(e => console.log('Autoplay blocked:', e));
-                    showStatus('מנגן בחיבור ישיר!');
+                    showStatus('מנגן בהצלחה!');
                 });
 
                 hls.on(Hls.Events.ERROR, function(event, data) {
                     if (data.fatal) {
-                        console.warn('Direct stream error:', data.details);
-                        showStatus('שגיאה בחיבור ישיר. ייתכן שהדפדפן חוסם תוכן לא מאובטח (HTTP).');
+                        console.warn('HLS Fatal Error:', data.type, data.details);
+                        showStatus('שגיאה בטעינת השידור');
                     }
                 });
             } else {
-                video.src = rawUrl;
+                video.src = proxiedUrl;
                 video.play().catch(e => console.log('Play error:', e));
                 showStatus('טוען נגן...');
             }
