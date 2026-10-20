@@ -2,101 +2,200 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>IPTV Player</title>
+
+    <!-- הגדרות PWA והתנהגות כאפליקציה במסך הבית של סמארטפון -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="IPTV Player">
+    <meta name="theme-color" content="#0b0f19">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
-        body { background-color: #0b0f19; color: #f8fafc; }
-        ::-webkit-scrollbar { width: 6px; }
+        body {
+            background-color: #0b0f19;
+            color: #f8fafc;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+        
+        .tile-dragging { opacity: 0.35; transform: scale(0.96); }
+        .tile-drag-over { border-color: #06b6d4 !important; background-color: rgba(6, 182, 212, 0.1) !important; transform: scale(1.02); }
+        
+        /* Fullscreen styles */
+        #player-container:fullscreen {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            background-color: black;
+        }
+        #player-container:-webkit-full-screen {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            background-color: black;
+        }
+
+        /* Prevent auto-zoom on iOS inputs */
+        input, select, textarea {
+            font-size: 16px !important;
+        }
+        @media (min-width: 640px) {
+            input, select, textarea {
+                font-size: 14px !important;
+            }
+        }
     </style>
 </head>
-<body class="h-screen flex flex-col font-sans overflow-hidden">
+<body class="h-screen flex flex-col font-sans overflow-hidden select-none">
 
     <!-- Header -->
-    <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 p-3 sm:p-4 flex justify-between items-center shadow-lg z-20 flex-shrink-0">
-        <div class="flex items-center space-x-3 space-x-reverse">
-            <span class="text-xl sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">IPTV Player</span>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hidden sm:inline-block">מצב פרוקסי מאובטח</span>
+    <header class="bg-slate-900/95 backdrop-blur border-b border-slate-800 p-2.5 sm:p-4 flex justify-between items-center shadow-lg z-30 flex-shrink-0">
+        <div class="flex items-center space-x-2 sm:space-x-3 space-x-reverse min-w-0">
+            <span class="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 whitespace-nowrap cursor-pointer" onclick="goHome()">
+                IPTV Player
+            </span>
+            <div id="breadcrumb" class="text-xs text-slate-400 flex items-center gap-1 truncate max-w-[150px] sm:max-w-xs">
+                <span onclick="goHome()" class="cursor-pointer hover:text-cyan-400">ראשי</span>
+            </div>
         </div>
-        <div class="flex items-center space-x-2 space-x-reverse">
-            <button onclick="toggleMobileSidebar()" class="md:hidden bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-700 transition">
-                📺 ערוצים
+        <div class="flex items-center space-x-2 space-x-reverse flex-shrink-0">
+            <button onclick="openHiddenManager()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1 active:scale-95" title="אריחים מוסתרים">
+                <span>🗑️</span>
+                <span class="hidden sm:inline">מוסתרים</span>
+                (<span id="hidden-count">0</span>)
             </button>
-            <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition shadow-md shadow-cyan-900/50 flex items-center gap-1.5">
-                <span>⚙️ הגדרות</span>
+            <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold transition shadow-md flex items-center gap-1">
+                <span>⚙️</span>
+                <span class="hidden sm:inline">הגדרות</span>
             </button>
         </div>
     </header>
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+    <div class="flex-1 flex flex-col overflow-hidden relative">
         
-        <!-- Sidebar: Categories & Streams -->
-        <aside id="sidebar" class="w-full md:w-80 lg:w-96 bg-slate-900/95 md:bg-slate-900/90 border-b md:border-b-0 md:border-l border-slate-800 flex flex-col flex-shrink-0 absolute md:relative inset-0 z-10 transition-transform duration-300 md:translate-x-0 hidden md:flex">
-            <!-- טאבים ראשיים -->
-            <div class="flex border-b border-slate-800 text-sm font-medium flex-shrink-0">
-                <button id="tab-live" onclick="switchTab('live')" class="flex-1 py-3 text-center border-b-2 border-cyan-500 text-cyan-400 font-bold transition">Live TV</button>
-                <button id="tab-movies" onclick="switchTab('movies')" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">סרטים</button>
-                <button id="tab-series" onclick="switchTab('series')" class="flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition">סדרות</button>
+        <!-- Navigation Tabs & Search Subheader -->
+        <div class="bg-slate-900/70 border-b border-slate-800 p-2 sm:p-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 flex-shrink-0">
+            <div class="flex border border-slate-800 bg-slate-950 rounded-xl p-1 w-full sm:w-auto">
+                <button id="tab-live" onclick="switchTab('live')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold text-cyan-400 bg-slate-800 transition active:scale-95">Live TV</button>
+                <button id="tab-movies" onclick="switchTab('movies')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-400 hover:text-white transition active:scale-95">סרטים</button>
+                <button id="tab-series" onclick="switchTab('series')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-400 hover:text-white transition active:scale-95">סדרות</button>
             </div>
+            <div class="w-full sm:w-80 flex items-center gap-2">
+                <button id="back-btn" onclick="goHome()" class="hidden bg-slate-800 hover:bg-slate-700 text-cyan-400 px-3 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95">⬅ חזרה</button>
+                <input type="text" id="search-input" oninput="filterContent()" placeholder="🔍 חיפוש ערוץ או סרט..." class="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500">
+            </div>
+        </div>
 
-            <!-- חיפוש וסינון קטגוריות -->
-            <div class="p-3 border-b border-slate-800 space-y-2 flex-shrink-0">
-                <input type="text" id="search-input" oninput="filterChannels()" placeholder="🔍 חיפוש ערוץ או תוכן..." class="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-xl text-sm focus:outline-none focus:border-cyan-500">
-                <select id="category-select" onchange="filterChannels()" class="w-full bg-slate-800 border border-slate-700 text-white p-2 rounded-xl text-sm focus:outline-none focus:border-cyan-500">
-                    <option value="all">כל הקטגוריות</option>
-                </select>
-            </div>
-
-            <!-- רשימת הערוצים -->
-            <div id="items-list" class="flex-1 overflow-y-auto p-3 space-y-1.5">
-                <div class="text-center text-slate-500 py-10">טוען נתונים...</div>
-            </div>
-        </aside>
-
-        <!-- Video Player Display -->
-        <main class="flex-1 flex flex-col bg-slate-950 justify-center items-center relative p-2 sm:p-6 overflow-hidden">
-            <div class="w-full max-w-5xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-slate-800/80 relative flex items-center justify-center">
-                <video id="video-player" playsinline controls autoplay class="w-full h-full object-contain"></video>
-                <div id="player-status" class="absolute bottom-4 left-4 right-4 bg-black/70 backdrop-blur-md px-4 py-2 rounded-xl text-xs text-slate-300 pointer-events-none transition-opacity duration-300 opacity-0"></div>
-            </div>
+        <!-- Content Grid & Responsive Player Split -->
+        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
             
-            <div class="w-full max-w-5xl mt-3 flex items-center justify-between px-2">
-                <div>
-                    <h2 id="current-title" class="text-base sm:text-lg font-bold text-slate-200 tracking-wide truncate">בחר ערוץ לצפייה</h2>
-                    <span id="current-mode" class="text-xs text-slate-500">מוכן לשידור</span>
+            <!-- Video Player Panel: Docked at top on mobile (< lg), side panel on desktop (lg:) -->
+            <div id="player-panel" class="w-full lg:w-[450px] xl:w-[500px] order-first lg:order-last bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col p-2.5 sm:p-4 flex-shrink-0 transition-all duration-300">
+                <div id="player-container" class="w-full aspect-video bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center group touch-none">
+                    <video id="video-player" playsinline webkit-playsinline controls autoplay class="w-full h-full object-contain"></video>
+
+                    <!-- Tap to Play Overlay (fixes mobile autoplay blocks) -->
+                    <div id="autoplay-prompt" onclick="resumeBlockedAutoplay()" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center gap-2 z-30 cursor-pointer">
+                        <button class="bg-cyan-600 hover:bg-cyan-500 text-white rounded-full p-4 text-2xl shadow-xl transition transform hover:scale-110 active:scale-90">
+                            ▶
+                        </button>
+                        <span class="text-xs sm:text-sm font-bold text-slate-200">לחץ להפעלת השידור</span>
+                    </div>
+
+                    <!-- Player Controls Overlay (Next / Prev + Fullscreen) -->
+                    <div id="player-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-between px-3 sm:px-4 transition-opacity duration-300 opacity-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 z-20">
+                        <button id="btn-next-ch" onclick="playNextChannel(event)" class="pointer-events-auto bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-700 shadow-xl backdrop-blur transition flex items-center justify-center" title="ערוץ הבא">
+                            <span class="text-base sm:text-lg">⏭️</span>
+                        </button>
+
+                        <button onclick="toggleCustomFullscreen(event)" class="pointer-events-auto absolute top-2.5 left-2.5 bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white px-2.5 py-1.5 rounded-xl border border-slate-700 shadow-xl backdrop-blur text-xs transition flex items-center gap-1" title="מסך מלא">
+                            ⛶ <span class="hidden sm:inline">מסך מלא</span>
+                        </button>
+
+                        <button id="btn-prev-ch" onclick="playPrevChannel(event)" class="pointer-events-auto bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-700 shadow-xl backdrop-blur transition flex items-center justify-center" title="ערוץ קודם">
+                            <span class="text-base sm:text-lg">⏮️</span>
+                        </button>
+                    </div>
+
+                    <div id="player-status" class="absolute bottom-3 left-3 right-3 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs text-slate-300 pointer-events-none transition-opacity duration-300 opacity-0 z-10 text-center truncate"></div>
+                </div>
+
+                <div class="mt-2 sm:mt-3 flex items-center justify-between">
+                    <div class="min-w-0 flex-1">
+                        <h2 id="current-title" class="text-sm sm:text-base font-bold text-slate-200 truncate">בחר ערוץ לצפייה</h2>
+                        <span id="current-mode" class="text-[11px] sm:text-xs text-slate-500 block truncate">מוכן לשידור</span>
+                    </div>
+                    <button id="toggle-player-btn" onclick="togglePlayerPanel()" class="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg bg-slate-900 text-xs active:scale-90 border border-slate-800" title="כווץ/הרחב נגן">
+                        🔼
+                    </button>
                 </div>
             </div>
-        </main>
+
+            <!-- Main Grid View -->
+            <div id="main-view" class="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
+                <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4 pb-12 sm:pb-6">
+                    <div class="text-center text-slate-500 py-10 col-span-full">טוען נתונים...</div>
+                </div>
+            </div>
+
+        </div>
     </div>
 
-    <!-- Modal settings -->
+    <!-- Modal: Hidden Items Manager -->
+    <div id="hidden-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50 p-4">
+        <div class="bg-slate-900 p-5 sm:p-6 rounded-2xl w-full max-w-lg border border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
+            <h2 class="text-lg font-bold mb-2 text-white">🗑️ ניהול אריחים מוסתרים</h2>
+            <p class="text-xs text-slate-400 mb-4">כאן תוכל לראות אריחים שהסתרת ולהחזיר אותם למסך הראשי.</p>
+            <div id="hidden-list" class="flex-1 overflow-y-auto space-y-2 mb-4 p-2 bg-slate-950 rounded-xl border border-slate-800 min-h-[120px]">
+                <div class="text-center text-slate-500 py-6">אין אריחים מוסתרים</div>
+            </div>
+            <div class="flex justify-end">
+                <button onclick="closeHiddenManager()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-sm rounded-xl transition">סגור</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Settings -->
     <div id="account-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50 p-4">
-        <div class="bg-slate-900 p-6 rounded-2xl w-full max-w-md border border-slate-800 shadow-2xl">
-            <h2 class="text-lg font-bold mb-4 text-white flex items-center gap-2">
-                <span>📡 הגדרות שרת IPTV</span>
-            </h2>
-            <div class="space-y-3">
+        <div class="bg-slate-900 p-5 sm:p-6 rounded-2xl w-full max-w-md border border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h2 class="text-lg font-bold mb-4 text-white">📡 הגדרות שרת IPTV ופרוקסי</h2>
+            <div class="space-y-3.5">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">כתובת שרת (Server URL)</label>
-                    <input type="text" id="cfg-server" placeholder="http://tv.business-cloud-8.ru" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">כתובת שרת IPTV</label>
+                    <input type="text" id="cfg-server" placeholder="http://tv.example.com:80" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">שם משתמש (Username)</label>
-                    <input type="text" id="cfg-user" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">שם משתמש</label>
+                    <input type="text" id="cfg-user" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">סיסמה (Password)</label>
-                    <input type="password" id="cfg-pass" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">סיסמה</label>
+                    <input type="password" id="cfg-pass" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                </div>
+                <div class="pt-2 border-t border-slate-800">
+                    <label class="block text-xs font-semibold text-cyan-400 mb-1">שרת פרוקסי ענן / מקומי (אופציונלי)</label>
+                    <input type="text" id="cfg-proxy" placeholder="ברירת מחדל: /proxy" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <p class="text-[11px] text-slate-400 mt-1">השאר ריק אם האתר מותקן יחד עם השרת (למשל Render או שרת מקומי). אם האתר מאוחסן בנפרד (כגון GitHub Pages), הזן את כתובת הפרוקסי ב-Render (לדוגמה: <span class="text-slate-300">https://my-proxy.onrender.com/proxy</span>).</p>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end space-x-2 space-x-reverse">
-                <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded-xl transition">ביטול</button>
-                <button onclick="saveAccount()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-xl transition shadow-lg shadow-cyan-900/50">שמור והתחבר</button>
+            <div class="mt-6 flex justify-between items-center">
+                <button onclick="resetAccountData()" class="text-xs text-red-400 hover:text-red-300 underline">אפס נתונים</button>
+                <div class="flex space-x-2 space-x-reverse">
+                    <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-sm rounded-xl transition">ביטול</button>
+                    <button onclick="saveAccount()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition shadow-md">שמור והתחבר</button>
+                </div>
             </div>
         </div>
     </div>
@@ -106,15 +205,31 @@
         let categories = [];
         let streams = [];
         let hls = null;
+        let currentView = 'countries';
+        let selectedCountryName = '';
+        let selectedProviderName = '';
+        let hiddenItems = JSON.parse(localStorage.getItem('iptv_hidden') || '[]');
+        let customOrder = JSON.parse(localStorage.getItem('iptv_order') || '{}');
+        let draggedItemKey = null;
+
+        let currentActiveChannelList = [];
+        let currentChannelIndex = -1;
+        let overlayTimeout = null;
+        let isPlayerCollapsed = false;
 
         document.addEventListener('DOMContentLoaded', () => {
-            const server = localStorage.getItem('iptv_server') || 'http://tv.business-cloud-8.ru';
+            const server = localStorage.getItem('iptv_server') || '';
             const user = localStorage.getItem('iptv_user') || '';
             const pass = localStorage.getItem('iptv_pass') || '';
+            const proxy = localStorage.getItem('iptv_proxy') || '';
 
             document.getElementById('cfg-server').value = server;
             document.getElementById('cfg-user').value = user;
             document.getElementById('cfg-pass').value = pass;
+            document.getElementById('cfg-proxy').value = proxy;
+
+            updateHiddenCount();
+            setupPlayerTouchGestures();
 
             if (server && user && pass) {
                 initApp();
@@ -123,26 +238,39 @@
             }
         });
 
-        function toggleMobileSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('hidden');
-        }
-
         function openModal() { document.getElementById('account-modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('account-modal').classList.add('hidden'); }
+        function openHiddenManager() { renderHiddenList(); document.getElementById('hidden-modal').classList.remove('hidden'); }
+        function closeHiddenManager() { document.getElementById('hidden-modal').classList.add('hidden'); }
 
         function saveAccount() {
             let server = document.getElementById('cfg-server').value.trim();
             if (server.endsWith('/')) server = server.slice(0, -1);
+
+            let proxy = document.getElementById('cfg-proxy').value.trim();
+            if (proxy.endsWith('/')) proxy = proxy.slice(0, -1);
+
             localStorage.setItem('iptv_server', server);
             localStorage.setItem('iptv_user', document.getElementById('cfg-user').value.trim());
             localStorage.setItem('iptv_pass', document.getElementById('cfg-pass').value.trim());
+            localStorage.setItem('iptv_proxy', proxy);
+
             closeModal();
             initApp();
         }
 
+        function resetAccountData() {
+            if (confirm('האם אתה בטוח שברצונך לאפס את כל הנתונים השמורים?')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
         function getProxyUrl(targetUrl) {
-            return `/proxy?url=${encodeURIComponent(targetUrl)}`;
+            let proxyBase = localStorage.getItem('iptv_proxy') || '/proxy';
+            if (!proxyBase.trim()) proxyBase = '/proxy';
+            const separator = proxyBase.includes('?') ? '&' : '?';
+            return `${proxyBase}${separator}url=${encodeURIComponent(targetUrl)}`;
         }
 
         function showStatus(msg) {
@@ -160,87 +288,27 @@
 
             if (!server || !user || !pass) return;
 
-            document.getElementById('items-list').innerHTML = '<div class="text-center text-slate-400 py-10">טוען נתונים מהשרת...</div>';
+            document.getElementById('grid-container').innerHTML = '<div class="text-center text-slate-400 py-10 col-span-full animate-pulse">טוען נתונים מהשרת...</div>';
 
             try {
                 let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
                 const catRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`));
                 categories = await catRes.json();
-                populateCategories();
 
                 let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
                 const streamRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${streamAction}`));
                 streams = await streamRes.json();
 
-                renderStreams(streams);
+                goHome();
             } catch (err) {
-                console.error('Error:', err);
-                document.getElementById('items-list').innerHTML = '<div class="text-center text-red-400 py-10">שגיאה בטעינת נתונים. בדוק הגדרות.</div>';
+                console.error('Error fetching IPTV data:', err);
+                document.getElementById('grid-container').innerHTML = `
+                    <div class="text-center text-red-400 py-10 col-span-full">
+                        <p class="font-bold mb-2">שגיאה בטעינת נתונים.</p>
+                        <p class="text-xs text-slate-400">בדוק את כתובת השרת, פרטי המשתמש או כתובת הפרוקסי בהגדרות.</p>
+                        <button onclick="openModal()" class="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl text-cyan-400">פתח הגדרות</button>
+                    </div>`;
             }
-        }
-
-        function populateCategories() {
-            const select = document.getElementById('category-select');
-            select.innerHTML = '<option value="all">כל הקטגוריות</option>';
-            if (Array.isArray(categories)) {
-                categories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat.category_id;
-                    opt.textContent = cat.category_name;
-                    select.appendChild(opt);
-                });
-            }
-        }
-
-        function renderStreams(items) {
-            const container = document.getElementById('items-list');
-            container.innerHTML = '';
-
-            if (!Array.isArray(items) || items.length === 0) {
-                container.innerHTML = '<div class="text-center text-slate-500 py-10">לא נמצאו פריטים</div>';
-                return;
-            }
-
-            const frag = document.createDocumentFragment();
-
-            items.forEach(item => {
-                const card = document.createElement('div');
-                card.className = 'bg-slate-800/80 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/50 p-2.5 rounded-xl cursor-pointer transition shadow flex items-center justify-between group';
-                
-                const title = item.name || item.title || 'ערוץ';
-                const streamId = item.stream_id || item.series_id;
-                const ext = item.container_extension || 'mp4';
-
-                card.innerHTML = `<span class="truncate text-xs sm:text-sm font-medium text-slate-200 group-hover:text-cyan-400 transition ml-2">${title}</span>
-                                  <span class="text-[11px] bg-slate-900 text-slate-400 px-2 py-1 rounded-lg flex-shrink-0 group-hover:bg-cyan-950 group-hover:text-cyan-300">▶ נגן</span>`;
-                
-                card.onclick = () => {
-                    if (window.innerWidth < 768) {
-                        document.getElementById('sidebar').classList.add('hidden');
-                    }
-                    playStream(streamId, title, ext);
-                };
-                frag.appendChild(card);
-            });
-
-            container.appendChild(frag);
-        }
-
-        function filterChannels() {
-            const catId = document.getElementById('category-select').value;
-            const search = (document.getElementById('search-input').value || '').trim().toLowerCase();
-
-            let filtered = streams;
-            if (catId !== 'all') {
-                filtered = filtered.filter(s => String(s.category_id) === String(catId));
-            }
-            if (search) {
-                filtered = filtered.filter(s => {
-                    const name = (s.name || s.title || '').toLowerCase();
-                    return name.includes(search);
-                });
-            }
-            renderStreams(filtered);
         }
 
         function switchTab(tab) {
@@ -248,13 +316,495 @@
             ['live', 'movies', 'series'].forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tab) {
-                    btn.className = 'flex-1 py-3 text-center border-b-2 border-cyan-500 text-cyan-400 font-bold transition';
+                    btn.className = 'flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold text-cyan-400 bg-slate-800 transition active:scale-95';
                 } else {
-                    btn.className = 'flex-1 py-3 text-center text-slate-400 hover:text-slate-200 transition';
+                    btn.className = 'flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-400 hover:text-white transition active:scale-95';
                 }
             });
             document.getElementById('search-input').value = '';
             initApp();
+        }
+
+        function parseCategoryName(name) {
+            let parts = (name || '').split(/[:|–-]/);
+            if (parts.length > 1) {
+                let country = parts[0].trim().toUpperCase();
+                let provider = parts.slice(1).join(' ').trim();
+                return { country, provider };
+            }
+            return { country: 'אחר', provider: (name || '').trim() };
+        }
+
+        function goHome() {
+            currentView = 'countries';
+            selectedCountryName = '';
+            selectedProviderName = '';
+            document.getElementById('back-btn').classList.add('hidden');
+            document.getElementById('breadcrumb').innerHTML = '<span class="cursor-pointer hover:text-cyan-400">ראשי</span>';
+            renderCountriesView();
+        }
+
+        function renderCountriesView() {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+
+            let countryMap = {};
+            categories.forEach(cat => {
+                if (hiddenItems.includes(cat.category_id)) return;
+                let parsed = parseCategoryName(cat.category_name);
+                if (!countryMap[parsed.country]) {
+                    countryMap[parsed.country] = [];
+                }
+                countryMap[parsed.country].push(cat);
+            });
+
+            let countries = Object.keys(countryMap);
+            const orderKey = `countries_${currentTab}`;
+            if (customOrder[orderKey]) {
+                countries.sort((a, b) => {
+                    let idxA = customOrder[orderKey].indexOf(a);
+                    let idxB = customOrder[orderKey].indexOf(b);
+                    if (idxA === -1) idxA = 999;
+                    if (idxB === -1) idxB = 999;
+                    return idxA - idxB;
+                });
+            }
+
+            if (countries.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-500 py-10 col-span-full">אין קטגוריות זמינות</div>';
+                return;
+            }
+
+            const frag = document.createDocumentFragment();
+            countries.forEach((country, index) => {
+                let count = countryMap[country].reduce((acc, cat) => {
+                    return acc + streams.filter(s => String(s.category_id) === String(cat.category_id)).length;
+                }, 0);
+
+                const tile = document.createElement('div');
+                tile.draggable = true;
+                tile.dataset.key = country;
+                tile.className = 'bg-slate-800/90 hover:bg-slate-800 active:scale-[0.98] border border-slate-700/60 hover:border-cyan-500 p-3 sm:p-4 rounded-xl sm:rounded-2xl cursor-grab transition flex flex-col justify-between shadow-lg group relative select-none';
+                
+                tile.innerHTML = `
+                    <div class="flex justify-between items-start mb-2 sm:mb-3">
+                        <span class="text-xl sm:text-2xl">🌍</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-500 text-xs cursor-move px-1 py-0.5 rounded hover:bg-slate-700 touch-drag-handle" title="גרור לסידור">⋮⋮</span>
+                            <button onclick="event.stopPropagation(); hideItem('${country}', 'country')" class="text-slate-400 hover:text-red-400 text-xs px-2 py-1 rounded bg-slate-900/80 active:scale-90" title="הסתר">✕</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-100 group-hover:text-cyan-400 transition truncate">${country}</h3>
+                        <span class="text-[11px] sm:text-xs text-slate-400">${count} פריטים</span>
+                    </div>
+                `;
+
+                attachDnDEvents(tile, orderKey, () => renderCountriesView());
+                tile.onclick = () => selectCountry(country, countryMap[country]);
+                frag.appendChild(tile);
+            });
+
+            container.appendChild(frag);
+        }
+
+        function selectCountry(countryName, countryCats) {
+            currentView = 'providers';
+            selectedCountryName = countryName;
+            document.getElementById('back-btn').classList.remove('hidden');
+            document.getElementById('breadcrumb').innerHTML = `<span onclick="goHome()" class="cursor-pointer hover:text-cyan-400">ראשי</span> / <span class="text-cyan-400 truncate">${countryName}</span>`;
+            
+            renderProvidersView(countryCats);
+        }
+
+        function renderProvidersView(countryCats) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+
+            const orderKey = `providers_${selectedCountryName}_${currentTab}`;
+            let catsToRender = [...countryCats];
+
+            if (customOrder[orderKey]) {
+                catsToRender.sort((a, b) => {
+                    let idxA = customOrder[orderKey].indexOf(String(a.category_id));
+                    let idxB = customOrder[orderKey].indexOf(String(b.category_id));
+                    if (idxA === -1) idxA = 999;
+                    if (idxB === -1) idxB = 999;
+                    return idxA - idxB;
+                });
+            }
+
+            const frag = document.createDocumentFragment();
+            catsToRender.forEach(cat => {
+                if (hiddenItems.includes(cat.category_id)) return;
+                let parsed = parseCategoryName(cat.category_name);
+                let catStreams = streams.filter(s => String(s.category_id) === String(cat.category_id));
+
+                const tile = document.createElement('div');
+                tile.draggable = true;
+                tile.dataset.key = String(cat.category_id);
+                tile.className = 'bg-slate-800/90 hover:bg-slate-800 active:scale-[0.98] border border-slate-700/60 hover:border-cyan-500 p-3 sm:p-4 rounded-xl sm:rounded-2xl cursor-grab transition flex flex-col justify-between shadow-lg group relative select-none';
+                
+                tile.innerHTML = `
+                    <div class="flex justify-between items-start mb-2 sm:mb-3">
+                        <span class="text-xl sm:text-2xl">📡</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-500 text-xs cursor-move px-1 py-0.5 rounded hover:bg-slate-700 touch-drag-handle" title="גרור לסידור">⋮⋮</span>
+                            <button onclick="event.stopPropagation(); hideItem('${cat.category_id}', 'category')" class="text-slate-400 hover:text-red-400 text-xs px-2 py-1 rounded bg-slate-900/80 active:scale-90" title="הסתר">✕</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-100 group-hover:text-cyan-400 transition truncate">${parsed.provider}</h3>
+                        <span class="text-[11px] sm:text-xs text-slate-400">${catStreams.length} ערוצים</span>
+                    </div>
+                `;
+
+                attachDnDEvents(tile, orderKey, () => renderProvidersView(countryCats));
+                tile.onclick = () => selectProvider(cat.category_id, parsed.provider, catStreams);
+                frag.appendChild(tile);
+            });
+
+            container.appendChild(frag);
+        }
+
+        function selectProvider(catId, providerName, catStreams) {
+            currentView = 'channels';
+            selectedProviderName = providerName;
+            document.getElementById('breadcrumb').innerHTML = `<span onclick="goHome()" class="cursor-pointer hover:text-cyan-400">ראשי</span> / <span onclick="selectCountryByBreadcrumb()" class="cursor-pointer hover:text-cyan-400">${selectedCountryName}</span> / <span class="text-cyan-400 truncate">${providerName}</span>`;
+
+            renderChannelsView(catStreams, catId);
+        }
+
+        function selectCountryByBreadcrumb() {
+            let countryCats = categories.filter(cat => parseCategoryName(cat.category_name).country === selectedCountryName);
+            selectCountry(selectedCountryName, countryCats);
+        }
+
+        function renderChannelsView(items, catId) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+
+            if (!Array.isArray(items) || items.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-500 py-10 col-span-full">לא נמצאו ערוצים או שידורים</div>';
+                return;
+            }
+
+            const orderKey = `channels_${catId}_${currentTab}`;
+            let channelsToRender = [...items];
+
+            if (customOrder[orderKey]) {
+                channelsToRender.sort((a, b) => {
+                    let idA = String(a.stream_id || a.series_id);
+                    let idB = String(b.stream_id || b.series_id);
+                    let idxA = customOrder[orderKey].indexOf(idA);
+                    let idxB = customOrder[orderKey].indexOf(idB);
+                    if (idxA === -1) idxA = 999;
+                    if (idxB === -1) idxB = 999;
+                    return idxA - idxB;
+                });
+            }
+
+            currentActiveChannelList = channelsToRender;
+
+            const frag = document.createDocumentFragment();
+            channelsToRender.forEach((item, index) => {
+                const tile = document.createElement('div');
+                const streamId = String(item.stream_id || item.series_id);
+                tile.draggable = true;
+                tile.dataset.key = streamId;
+                tile.className = 'bg-slate-800/90 hover:bg-cyan-950/60 active:scale-[0.98] border border-slate-700/60 hover:border-cyan-500 p-2.5 sm:p-3 rounded-xl cursor-grab transition flex flex-col justify-between group select-none min-h-[75px] sm:min-h-[90px]';
+                
+                const title = item.name || item.title || 'ערוץ';
+
+                tile.innerHTML = `
+                    <div class="flex items-center justify-between mb-1 sm:mb-2">
+                        <span class="text-[10px] bg-slate-900 text-slate-400 px-1.5 py-0.5 rounded group-hover:text-cyan-300">▶ נגן</span>
+                        <span class="text-slate-600 text-xs px-1 py-0.5 rounded touch-drag-handle">⋮⋮</span>
+                    </div>
+                    <div class="text-xs sm:text-sm font-medium text-slate-200 group-hover:text-cyan-300 transition line-clamp-2 leading-snug">${title}</div>
+                `;
+
+                attachDnDEvents(tile, orderKey, () => renderChannelsView(items, catId));
+                tile.onclick = () => playStreamByIndex(index);
+                frag.appendChild(tile);
+            });
+
+            container.appendChild(frag);
+        }
+
+        /**
+         * Touch & Mouse Drag-and-Drop Handler
+         */
+        function attachDnDEvents(element, orderKey, refreshCallback) {
+            // Desktop HTML5 DnD
+            element.addEventListener('dragstart', (e) => {
+                draggedItemKey = element.dataset.key;
+                element.classList.add('tile-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            element.addEventListener('dragend', () => {
+                element.classList.remove('tile-dragging');
+                document.querySelectorAll('#grid-container > div').forEach(el => el.classList.remove('tile-drag-over'));
+            });
+
+            element.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                element.classList.add('tile-drag-over');
+            });
+
+            element.addEventListener('dragleave', () => {
+                element.classList.remove('tile-drag-over');
+            });
+
+            element.addEventListener('drop', (e) => {
+                e.preventDefault();
+                element.classList.remove('tile-drag-over');
+                const targetKey = element.dataset.key;
+
+                if (draggedItemKey && draggedItemKey !== targetKey) {
+                    reorderItems(orderKey, draggedItemKey, targetKey);
+                    refreshCallback();
+                }
+            });
+
+            // Touch Drag Polyfill for Mobile Screens
+            const handle = element.querySelector('.touch-drag-handle') || element;
+            let touchTimer = null;
+            let isTouchDragging = false;
+            let currentHoverTarget = null;
+
+            handle.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                touchTimer = setTimeout(() => {
+                    isTouchDragging = true;
+                    draggedItemKey = element.dataset.key;
+                    element.classList.add('tile-dragging');
+                    if (navigator.vibrate) navigator.vibrate(40);
+                }, 200);
+            }, { passive: true });
+
+            handle.addEventListener('touchmove', (e) => {
+                if (!isTouchDragging) {
+                    clearTimeout(touchTimer);
+                    return;
+                }
+                e.preventDefault(); // Stop page scrolling during touch reorder
+                const touch = e.touches[0];
+                const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                const tileBelow = elemBelow ? elemBelow.closest('#grid-container > div') : null;
+
+                document.querySelectorAll('#grid-container > div').forEach(el => el.classList.remove('tile-drag-over'));
+                if (tileBelow && tileBelow !== element) {
+                    currentHoverTarget = tileBelow;
+                    tileBelow.classList.add('tile-drag-over');
+                } else {
+                    currentHoverTarget = null;
+                }
+            }, { passive: false });
+
+            handle.addEventListener('touchend', () => {
+                clearTimeout(touchTimer);
+                if (isTouchDragging) {
+                    element.classList.remove('tile-dragging');
+                    document.querySelectorAll('#grid-container > div').forEach(el => el.classList.remove('tile-drag-over'));
+                    if (currentHoverTarget && currentHoverTarget.dataset.key) {
+                        const targetKey = currentHoverTarget.dataset.key;
+                        if (draggedItemKey && draggedItemKey !== targetKey) {
+                            reorderItems(orderKey, draggedItemKey, targetKey);
+                            refreshCallback();
+                        }
+                    }
+                    isTouchDragging = false;
+                    currentHoverTarget = null;
+                }
+            });
+        }
+
+        function reorderItems(orderKey, sourceKey, targetKey) {
+            const container = document.getElementById('grid-container');
+            const currentKeys = Array.from(container.children).map(child => child.dataset.key).filter(Boolean);
+
+            const sourceIdx = currentKeys.indexOf(sourceKey);
+            const targetIdx = currentKeys.indexOf(targetKey);
+
+            if (sourceIdx !== -1 && targetIdx !== -1) {
+                currentKeys.splice(sourceIdx, 1);
+                currentKeys.splice(targetIdx, 0, sourceKey);
+                customOrder[orderKey] = currentKeys;
+                localStorage.setItem('iptv_order', JSON.stringify(customOrder));
+            }
+        }
+
+        function hideItem(id, type) {
+            if (!hiddenItems.includes(id)) {
+                hiddenItems.push(id);
+                localStorage.setItem('iptv_hidden', JSON.stringify(hiddenItems));
+                updateHiddenCount();
+                if (currentView === 'countries') renderCountriesView();
+                else if (currentView === 'providers') {
+                    let countryCats = categories.filter(cat => parseCategoryName(cat.category_name).country === selectedCountryName);
+                    renderProvidersView(countryCats);
+                }
+            }
+        }
+
+        function unhideItem(id) {
+            hiddenItems = hiddenItems.filter(item => item !== id);
+            localStorage.setItem('iptv_hidden', JSON.stringify(hiddenItems));
+            updateHiddenCount();
+            renderHiddenList();
+            if (currentView === 'countries') renderCountriesView();
+        }
+
+        function updateHiddenCount() {
+            document.getElementById('hidden-count').textContent = hiddenItems.length;
+        }
+
+        function renderHiddenList() {
+            const listEl = document.getElementById('hidden-list');
+            listEl.innerHTML = '';
+
+            if (hiddenItems.length === 0) {
+                listEl.innerHTML = '<div class="text-center text-slate-500 py-6">אין אריחים מוסתרים</div>';
+                return;
+            }
+
+            hiddenItems.forEach(id => {
+                let name = id;
+                let foundCat = categories.find(c => String(c.category_id) === String(id));
+                if (foundCat) name = foundCat.category_name;
+
+                const row = document.createElement('div');
+                row.className = 'flex justify-between items-center bg-slate-900 p-2.5 rounded-xl border border-slate-800';
+                row.innerHTML = `<span class="text-xs text-slate-200 truncate max-w-[200px]">${name}</span>
+                                 <button onclick="unhideItem('${id}')" class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-xs rounded-lg transition">החזר</button>`;
+                listEl.appendChild(row);
+            });
+        }
+
+        function filterContent() {
+            const query = document.getElementById('search-input').value.trim().toLowerCase();
+            if (!query) {
+                if (currentView === 'countries') renderCountriesView();
+                return;
+            }
+
+            const filteredStreams = streams.filter(s => (s.name || s.title || '').toLowerCase().includes(query));
+            currentView = 'channels';
+            document.getElementById('back-btn').classList.remove('hidden');
+            document.getElementById('breadcrumb').innerHTML = `<span onclick="goHome()" class="cursor-pointer hover:text-cyan-400">ראשי</span> / <span class="text-cyan-400">חיפוש</span>`;
+            renderChannelsView(filteredStreams, 'search');
+        }
+
+        function handlePlayerMouseMove() {
+            const overlay = document.getElementById('player-overlay');
+            overlay.classList.remove('opacity-0');
+
+            clearTimeout(overlayTimeout);
+            overlayTimeout = setTimeout(() => {
+                overlay.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        function togglePlayerPanel() {
+            const container = document.getElementById('player-container');
+            const btn = document.getElementById('toggle-player-btn');
+            isPlayerCollapsed = !isPlayerCollapsed;
+
+            if (isPlayerCollapsed) {
+                container.classList.add('hidden');
+                btn.textContent = '🔽';
+            } else {
+                container.classList.remove('hidden');
+                btn.textContent = '🔼';
+            }
+        }
+
+        function toggleCustomFullscreen(e) {
+            if (e) e.stopPropagation();
+            const container = document.getElementById('player-container');
+            const video = document.getElementById('video-player');
+
+            // Standard Fullscreen API
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) {
+                    container.webkitRequestFullscreen();
+                } else if (video.webkitEnterFullscreen) {
+                    // iOS Safari native video fullscreen
+                    video.webkitEnterFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+
+        function playStreamByIndex(index) {
+            if (!currentActiveChannelList || index < 0 || index >= currentActiveChannelList.length) return;
+            currentChannelIndex = index;
+            const item = currentActiveChannelList[index];
+
+            const title = item.name || item.title || 'ערוץ';
+            const streamId = item.stream_id || item.series_id;
+            const ext = item.container_extension || 'mp4';
+
+            // Ensure player container is expanded on mobile when choosing a stream
+            if (isPlayerCollapsed) togglePlayerPanel();
+
+            playStream(streamId, title, ext);
+        }
+
+        function playNextChannel(event) {
+            if (event) event.stopPropagation();
+            if (currentActiveChannelList.length === 0) return;
+            let nextIndex = (currentChannelIndex + 1) % currentActiveChannelList.length;
+            playStreamByIndex(nextIndex);
+            handlePlayerMouseMove();
+        }
+
+        function playPrevChannel(event) {
+            if (event) event.stopPropagation();
+            if (currentActiveChannelList.length === 0) return;
+            let prevIndex = (currentChannelIndex - 1 + currentActiveChannelList.length) % currentActiveChannelList.length;
+            playStreamByIndex(prevIndex);
+            handlePlayerMouseMove();
+        }
+
+        function showAutoplayPrompt() {
+            document.getElementById('autoplay-prompt').classList.remove('hidden');
+            document.getElementById('autoplay-prompt').classList.add('flex');
+        }
+
+        function hideAutoplayPrompt() {
+            document.getElementById('autoplay-prompt').classList.add('hidden');
+            document.getElementById('autoplay-prompt').classList.remove('flex');
+        }
+
+        function resumeBlockedAutoplay() {
+            hideAutoplayPrompt();
+            const video = document.getElementById('video-player');
+            video.play().catch(e => console.log('Playback error:', e));
+        }
+
+        function triggerVideoPlay(video) {
+            const playPromise = video.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    hideAutoplayPrompt();
+                    showStatus('מנגן בהצלחה!');
+                }).catch(err => {
+                    console.warn('Autoplay blocked by mobile browser:', err);
+                    showAutoplayPrompt();
+                    showStatus('לחץ להפעלת השידור');
+                });
+            }
         }
 
         function playStream(streamId, title, ext) {
@@ -263,6 +813,7 @@
             const pass = localStorage.getItem('iptv_pass');
 
             document.getElementById('current-title').textContent = title;
+            hideAutoplayPrompt();
 
             let rawUrl = '';
             if (currentTab === 'live') {
@@ -281,37 +832,91 @@
             }
 
             const proxiedUrl = getProxyUrl(rawUrl);
-            document.getElementById('current-mode').textContent = 'מנגן דרך פרוקסי מאובטח';
+            document.getElementById('current-mode').textContent = 'מנגן דרך פרוקסי';
 
             showStatus(`מתחבר ל-${title}...`);
+            handlePlayerMouseMove();
 
-            const isHlsStream = rawUrl.includes('.m3u8');
+            const isM3u8 = rawUrl.includes('.m3u8');
 
-            if (isHlsStream && Hls.isSupported()) {
-                hls = new Hls({
-                    enableWorker: true,
-                    lowLatencyMode: true
-                });
+            if (isM3u8) {
+                if (Hls.isSupported()) {
+                    hls = new Hls({
+                        enableWorker: true,
+                        lowLatencyMode: true,
+                        backBufferLength: 30
+                    });
+                    hls.loadSource(proxiedUrl);
+                    hls.attachMedia(video);
 
-                hls.loadSource(proxiedUrl);
-                hls.attachMedia(video);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        triggerVideoPlay(video);
+                    });
 
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    video.play().catch(e => console.log('Autoplay blocked:', e));
-                    showStatus('מנגן בהצלחה!');
-                });
-
-                hls.on(Hls.Events.ERROR, function(event, data) {
-                    if (data.fatal) {
-                        console.warn('HLS Fatal Error:', data.type, data.details);
-                        showStatus('שגיאה בטעינת השידור');
-                    }
-                });
+                    hls.on(Hls.Events.ERROR, (event, data) => {
+                        if (data.fatal) {
+                            switch (data.type) {
+                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                    showStatus('שגיאת תקשורת בטעינת השידור');
+                                    hls.startLoad();
+                                    break;
+                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                    showStatus('משחזר תקלת מדיה...');
+                                    hls.recoverMediaError();
+                                    break;
+                                default:
+                                    showStatus('שגיאה בשידור');
+                                    hls.destroy();
+                                    break;
+                            }
+                        }
+                    });
+                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                    // iOS Safari Native HLS Support
+                    video.src = proxiedUrl;
+                    video.addEventListener('loadedmetadata', () => {
+                        triggerVideoPlay(video);
+                    }, { once: true });
+                } else {
+                    video.src = proxiedUrl;
+                    triggerVideoPlay(video);
+                }
             } else {
+                // Direct MP4 / VOD
                 video.src = proxiedUrl;
-                video.play().catch(e => console.log('Play error:', e));
-                showStatus('טוען נגן...');
+                triggerVideoPlay(video);
             }
+        }
+
+        /**
+         * Mobile Swipe Gesture on Player (Swipe left for Next, Swipe right for Prev)
+         */
+        function setupPlayerTouchGestures() {
+            const player = document.getElementById('player-container');
+            let startX = 0;
+            let startY = 0;
+
+            player.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                handlePlayerMouseMove();
+            }, { passive: true });
+
+            player.addEventListener('touchend', (e) => {
+                const diffX = e.changedTouches[0].clientX - startX;
+                const diffY = e.changedTouches[0].clientY - startY;
+
+                // Detect horizontal swipe if delta X > 50 and horizontal movement > vertical movement
+                if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX < 0) {
+                        // Swipe Left -> In RTL, Next Channel
+                        playNextChannel();
+                    } else {
+                        // Swipe Right -> In RTL, Prev Channel
+                        playPrevChannel();
+                    }
+                }
+            }, { passive: true });
         }
     </script>
 </body>
