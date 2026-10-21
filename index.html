@@ -2,210 +2,207 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IPTV Player</title>
-
-    <!-- הגדרות PWA והתנהגות כאפליקציה במסך הבית של סמארטפון -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="IPTV Player">
-    <meta name="theme-color" content="#0b0f19">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" type="image/png" href="icon.png">
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <style>
-        body {
-            background-color: #0b0f19;
-            color: #f8fafc;
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-            -webkit-tap-highlight-color: transparent;
-        }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
-        
-        .tile-dragging { opacity: 0.35; transform: scale(0.96); }
-        .tile-drag-over { border-color: #06b6d4 !important; background-color: rgba(6, 182, 212, 0.1) !important; transform: scale(1.02); }
-        
-        /* Fullscreen styles */
-        #player-container:fullscreen {
-            width: 100vw;
-            height: 100vh;
-            border-radius: 0;
-            background-color: black;
-        }
-        #player-container:-webkit-full-screen {
-            width: 100vw;
-            height: 100vh;
-            border-radius: 0;
-            background-color: black;
-        }
-
-        /* Prevent auto-zoom on iOS inputs */
-        input, select, textarea {
-            font-size: 16px !important;
-        }
-        @media (min-width: 640px) {
-            input, select, textarea {
-                font-size: 14px !important;
-            }
-        }
-    </style>
 </head>
-<body class="h-screen flex flex-col font-sans overflow-hidden select-none">
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
 
     <!-- Header -->
-    <header class="bg-slate-900/95 backdrop-blur border-b border-slate-800 p-2.5 sm:p-4 flex justify-between items-center shadow-lg z-30 flex-shrink-0">
-        <div class="flex items-center space-x-2 sm:space-x-3 space-x-reverse min-w-0">
-            <span class="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 whitespace-nowrap cursor-pointer" onclick="goHome()">
-                IPTV Player
-            </span>
-            <div id="breadcrumb" class="text-xs text-slate-400 flex items-center gap-1 truncate max-w-[150px] sm:max-w-xs">
-                <span onclick="goHome()" class="cursor-pointer hover:text-cyan-400">ראשי</span>
-            </div>
-        </div>
-        <div class="flex items-center space-x-2 space-x-reverse flex-shrink-0">
-            <button id="btn-logout" onclick="logoutApp()" class="hidden bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-400 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-700 hover:border-red-800 transition flex items-center gap-1 active:scale-95" title="התנתק מהמערכת"><span>🔒</span><span class="hidden sm:inline">התנתק</span></button>
-            <button onclick="openHiddenManager()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1 active:scale-95" title="אריחים מוסתרים">
-                <span>🗑️</span>
-                <span class="hidden sm:inline">מוסתרים</span>
-                (<span id="hidden-count">0</span>)
-            </button>
-            <button onclick="openModal()" class="bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold transition shadow-md flex items-center gap-1">
-                <span>⚙️</span>
-                <span class="hidden sm:inline">הגדרות</span>
+    <header class="bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center shadow-md">
+        <h1 class="text-xl font-bold text-cyan-400 flex items-center gap-2">
+            📺 IPTV Player
+        </h1>
+        <div class="flex items-center gap-2">
+            <button onclick="openModal()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">
+                ⚙️ הגדרות
             </button>
         </div>
     </header>
 
-    <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col overflow-hidden relative">
-        
-        <!-- Navigation Tabs & Search Subheader -->
-        <div class="bg-slate-900/70 border-b border-slate-800 p-2 sm:p-3 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 flex-shrink-0">
-            <div class="flex border border-slate-800 bg-slate-950 rounded-xl p-1 w-full sm:w-auto">
-                <button id="tab-live" onclick="switchTab('live')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold text-cyan-400 bg-slate-800 transition active:scale-95">Live TV</button>
-                <button id="tab-movies" onclick="switchTab('movies')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-400 hover:text-white transition active:scale-95">סרטים</button>
-                <button id="tab-series" onclick="switchTab('series')" class="flex-1 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-400 hover:text-white transition active:scale-95">סדרות</button>
+    <!-- Main Player & Grid Layout -->
+    <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
+        <!-- Player Container -->
+        <div class="lg:col-span-2 flex flex-col gap-3">
+            <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
+                <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div class="w-full sm:w-80 flex items-center gap-2">
-                <button id="back-btn" onclick="goHome()" class="hidden bg-slate-800 hover:bg-slate-700 text-cyan-400 px-3 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap active:scale-95">⬅ חזרה</button>
-                <input type="text" id="search-input" oninput="filterContent()" placeholder="🔍 חיפוש ערוץ או סרט..." class="w-full bg-slate-950 border border-slate-800 text-white px-3 py-2 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500">
-            </div>
+            <div id="status-msg" class="text-xs text-slate-400 min-h-[20px]"></div>
         </div>
 
-        <!-- Content Grid & Responsive Player Split -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            
-            <!-- Video Player Panel: Docked at top on mobile (< lg), side panel on desktop (lg:) -->
-            <div id="player-panel" class="w-full lg:w-[450px] xl:w-[500px] order-first lg:order-last bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-800 flex flex-col p-2.5 sm:p-4 flex-shrink-0 transition-all duration-300">
-                <div id="player-container" class="w-full aspect-video bg-black rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border border-slate-800 relative flex items-center justify-center group touch-none">
-                    <video id="video-player" playsinline webkit-playsinline controls autoplay class="w-full h-full object-contain"></video>
-
-                    <!-- Tap to Play Overlay (fixes mobile autoplay blocks) -->
-                    <div id="autoplay-prompt" onclick="resumeBlockedAutoplay()" class="absolute inset-0 bg-black/80 backdrop-blur-sm hidden flex-col items-center justify-center gap-2 z-30 cursor-pointer">
-                        <button class="bg-cyan-600 hover:bg-cyan-500 text-white rounded-full p-4 text-2xl shadow-xl transition transform hover:scale-110 active:scale-90">
-                            ▶
-                        </button>
-                        <span class="text-xs sm:text-sm font-bold text-slate-200">לחץ להפעלת השידור</span>
-                    </div>
-
-                    <!-- Player Controls Overlay (Next / Prev + Fullscreen) -->
-                    <div id="player-overlay" class="absolute inset-0 pointer-events-none flex items-center justify-between px-3 sm:px-4 transition-opacity duration-300 opacity-0 bg-gradient-to-t from-black/70 via-transparent to-black/40 z-20">
-                        <button id="btn-next-ch" onclick="playNextChannel(event)" class="pointer-events-auto bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-700 shadow-xl backdrop-blur transition flex items-center justify-center" title="ערוץ הבא">
-                            <span class="text-base sm:text-lg">⏭️</span>
-                        </button>
-
-                        <button onclick="toggleCustomFullscreen(event)" class="pointer-events-auto absolute top-2.5 left-2.5 bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white px-2.5 py-1.5 rounded-xl border border-slate-700 shadow-xl backdrop-blur text-xs transition flex items-center gap-1" title="מסך מלא">
-                            ⛶ <span class="hidden sm:inline">מסך מלא</span>
-                        </button>
-
-                        <button id="btn-prev-ch" onclick="playPrevChannel(event)" class="pointer-events-auto bg-slate-900/85 hover:bg-cyan-600 active:scale-90 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-slate-700 shadow-xl backdrop-blur transition flex items-center justify-center" title="ערוץ קודם">
-                            <span class="text-base sm:text-lg">⏮️</span>
-                        </button>
-                    </div>
-
-                    <div id="player-status" class="absolute bottom-3 left-3 right-3 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl text-xs text-slate-300 pointer-events-none transition-opacity duration-300 opacity-0 z-10 text-center truncate"></div>
-                </div>
-
-                <div class="mt-2 sm:mt-3 flex items-center justify-between">
-                    <div class="min-w-0 flex-1">
-                        <h2 id="current-title" class="text-sm sm:text-base font-bold text-slate-200 truncate">בחר ערוץ לצפייה</h2>
-                        <span id="current-mode" class="text-[11px] sm:text-xs text-slate-500 block truncate">מוכן לשידור</span>
-                    </div>
-                    <button id="toggle-player-btn" onclick="togglePlayerPanel()" class="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg bg-slate-900 text-xs active:scale-90 border border-slate-800" title="כווץ/הרחב נגן">
-                        🔼
-                    </button>
-                </div>
-            </div>
-
-            <!-- Main Grid View -->
-            <div id="main-view" class="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-                <div id="grid-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5 sm:gap-4 pb-12 sm:pb-6">
-                    <div class="text-center text-slate-500 py-10 col-span-full">טוען נתונים...</div>
-                </div>
-            </div>
-
+        <!-- Channels Container -->
+        <div class="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-4 flex flex-col gap-3 h-[600px]">
+            <input type="text" id="search-input" oninput="filterChannels()" placeholder="חיפוש ערוץ..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-cyan-500">
+            <div id="grid-container" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
         </div>
-    </div>
+    </main>
 
-    <!-- Modal: Hidden Items Manager -->
-    <div id="hidden-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50 p-4">
-        <div class="bg-slate-900 p-5 sm:p-6 rounded-2xl w-full max-w-lg border border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
-            <h2 class="text-lg font-bold mb-2 text-white">🗑️ ניהול אריחים מוסתרים</h2>
-            <p class="text-xs text-slate-400 mb-4">כאן תוכל לראות אריחים שהסתרת ולהחזיר אותם למסך הראשי.</p>
-            <div id="hidden-list" class="flex-1 overflow-y-auto space-y-2 mb-4 p-2 bg-slate-950 rounded-xl border border-slate-800 min-h-[120px]">
-                <div class="text-center text-slate-500 py-6">אין אריחים מוסתרים</div>
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4">
+            <h2 class="text-lg font-bold text-cyan-400 flex items-center gap-2">
+                ⚙️ הגדרות שרת IPTV ופרוקסי
+            </h2>
+
+            <div class="space-y-3 text-sm">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">כתובת שרת IPTV</label>
+                    <input type="text" id="cfg-server" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">שם משתמש</label>
+                    <input type="text" id="cfg-user" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">סיסמה</label>
+                    <input type="password" id="cfg-pass" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">שרת פרוקסי ענן / מקומי (אופציונלי)</label>
+                    <input type="text" id="cfg-proxy" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">סיסמת אפליקציה (APP_PASSWORD - אופציונלי)</label>
+                    <input type="password" id="cfg-app-pass" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 focus:outline-none focus:border-cyan-500">
+                </div>
             </div>
-            <div class="flex justify-end">
-                <button onclick="closeHiddenManager()" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-sm rounded-xl transition">סגור</button>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-700">
+                <button onclick="saveSettings()" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-xs text-white font-semibold rounded-xl transition shadow-lg">
+                    שמור והתחבר
+                </button>
+                <button onclick="closeModal()" class="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-xs text-slate-300 rounded-xl transition">
+                    ביטול
+                </button>
+                <button onclick="resetData()" class="px-3 py-2.5 text-xs text-red-400 hover:text-red-300 transition">
+                    אפס נתונים
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- Modal Settings -->
-    <div id="account-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md flex justify-center items-center hidden z-50 p-4">
-        <div class="bg-slate-900 p-5 sm:p-6 rounded-2xl w-full max-w-md border border-slate-800 shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h2 class="text-lg font-bold mb-4 text-white">📡 הגדרות שרת IPTV ופרוקסי</h2>
-            <div class="space-y-3.5">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">כתובת שרת IPTV</label>
-                    <input type="text" id="cfg-server" placeholder="http://thy30188.wd.business-cloud-8.ru" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">שם משתמש</label>
-                    <input type="text" id="cfg-user" placeholder="d48e6682bdb8" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">סיסמה</label>
-                    <input type="password" id="cfg-pass" placeholder="a6af461b63" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
-                </div>
-                <div class="pt-2 border-t border-slate-800">
-                    <label class="block text-xs font-semibold text-cyan-400 mb-1">שרת פרוקסי ענן / מקומי (אופציונלי)</label>
-                    <input type="text" id="cfg-proxy" placeholder="ברירת מחדל: /proxy" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
-                    <p class="text-[11px] text-slate-400 mt-1">השאר ריק אם האתר מותקן יחד עם השרת (למשל Render או שרת מקומי). אם האתר מאוחסן בנפרד (כגון GitHub Pages), הזן את כתובת הפרוקסי ב-Render (לדוגמה: <span class="text-slate-300">https://my-proxy.onrender.com/proxy</span>).</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-cyan-400 mb-1">סיסמת אפליקציה (APP_PASSWORD - אופציונלי)</label>
-                    <input type="password" id="cfg-app-pass" placeholder="הזן אם שרת הפרוקסי מוגן בסיסמה" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
-                    <p class="text-[11px] text-slate-400 mt-1">אם הוגדרה סיסמה בשרת, היא תצורף אוטומטית לבקשות הפרוקסי.</p>
-                </div>
-            </div>
-            <div class="mt-6 flex justify-between items-center">
-                <button onclick="resetAccountData()" class="text-xs text-red-400 hover:text-red-300 underline">אפס נתונים</button>
-                <div class="flex space-x-2 space-x-reverse">
-                    <button onclick="closeModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white text-sm rounded-xl transition">ביטול</button>
-                    <button onclick="saveAccount()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 active:scale-95 text-white text-sm font-semibold rounded-xl transition shadow-md">שמור והתחבר</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <script>
+        let hls = new Hls();
+        let allChannels = [];
 
-    <script src="app.js"></script>
+        function openModal() {
+            document.getElementById('cfg-server').value = localStorage.getItem('iptv_server') || '';
+            document.getElementById('cfg-user').value = localStorage.getItem('iptv_user') || '';
+            document.getElementById('cfg-pass').value = localStorage.getItem('iptv_pass') || '';
+            document.getElementById('cfg-proxy').value = localStorage.getItem('iptv_proxy') || '/proxy';
+            document.getElementById('cfg-app-pass').value = localStorage.getItem('iptv_app_pass') || '';
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        }
+
+        function saveSettings() {
+            localStorage.setItem('iptv_server', document.getElementById('cfg-server').value.trim());
+            localStorage.setItem('iptv_user', document.getElementById('cfg-user').value.trim());
+            localStorage.setItem('iptv_pass', document.getElementById('cfg-pass').value.trim());
+            localStorage.setItem('iptv_proxy', document.getElementById('cfg-proxy').value.trim() || '/proxy');
+            localStorage.setItem('iptv_app_pass', document.getElementById('cfg-app-pass').value.trim());
+            closeModal();
+            initApp();
+        }
+
+        function resetData() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        function getProxyUrl(target) {
+            const proxy = localStorage.getItem('iptv_proxy') || '/proxy';
+            const appPass = localStorage.getItem('iptv_app_pass');
+            let url = `${proxy}?url=${encodeURIComponent(target)}`;
+            if (appPass) url += `&auth=${encodeURIComponent(appPass)}`;
+            return url;
+        }
+
+        async function initApp() {
+            const server = localStorage.getItem('iptv_server');
+            const user = localStorage.getItem('iptv_user');
+            const pass = localStorage.getItem('iptv_pass');
+
+            if (!server || !user || !pass) {
+                openModal();
+                return;
+            }
+
+            const playlistUrl = `${server}/get.php?username=${user}&password=${pass}&type=m3u_plus&output=ts`;
+            const proxyPlaylist = getProxyUrl(playlistUrl);
+
+            try {
+                document.getElementById('status-msg').innerText = 'טוען ערוצים...';
+                const res = await fetch(proxyPlaylist);
+                if (!res.ok) throw new Error('שגיאה שטעינת הפלייליסט');
+                const text = await res.text();
+                parseM3U(text);
+                document.getElementById('status-msg').innerText = '';
+            } catch (err) {
+                document.getElementById('status-msg').innerText = 'שגיאה בחיבור לשרת ה-IPTV';
+            }
+        }
+
+        function parseM3U(content) {
+            const lines = content.split('\n');
+            allChannels = [];
+            let currentChannel = null;
+
+            lines.forEach(line => {
+                line = line.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const name = line.split(',')[1] || 'ערוץ ללא שם';
+                    currentChannel = { name };
+                } else if (line && !line.startsWith('#') && currentChannel) {
+                    currentChannel.url = line;
+                    allChannels.push(currentChannel);
+                    currentChannel = null;
+                }
+            });
+
+            renderChannels(allChannels);
+        }
+
+        function renderChannels(channels) {
+            const container = document.getElementById('grid-container');
+            container.innerHTML = '';
+
+            channels.forEach(ch => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-right p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition border border-slate-700/50 flex items-center justify-between';
+                btn.innerHTML = `<span class="font-medium text-sm">${ch.name}</span>`;
+                btn.onclick = () => playStream(ch.url);
+                container.appendChild(btn);
+            });
+        }
+
+        function filterChannels() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allChannels.filter(c => c.name.toLowerCase().includes(query));
+            renderChannels(filtered);
+        }
+
+        function playStream(url) {
+            const video = document.getElementById('video-player');
+            const streamUrl = getProxyUrl(url);
+
+            if (Hls.isSupported()) {
+                hls.destroy();
+                hls = new Hls();
+                hls.loadSource(streamUrl);
+                hls.attachMedia(video);
+                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play());
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = streamUrl;
+                video.play();
+            }
+        }
+
+        window.onload = initApp;
+    </script>
 </body>
 </html>
