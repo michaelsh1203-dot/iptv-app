@@ -60,3 +60,25 @@ docker run -p 3000:3000 iptv-app
 3. **שרת פרוקסי**:
    - אם האתר והפרוקסי מאוחסנים באותה כתובת (כגון Render או Vercel), השאר את שדה הפרוקסי **ריק** (הוא ישתמש אוטומטית ב-`/proxy`).
    - אם אחסנת את ה-Frontend בנפרד (לדוגמה ב-GitHub Pages), תוכל להזין בשדה זה את כתובת הפרוקסי שלך ב-Render.
+
+
+---
+
+## 🔒 אבטחה והגנה בסיסמה (`APP_PASSWORD`)
+
+ניתן להגן על השרת, ממשק המשתמש ונתיבי הפרוקסי באמצעות משתנה סביבה בשם `APP_PASSWORD`:
+- **הפעלה מקומית / VPS**:
+  ```bash
+  # Windows PowerShell:
+  $env:APP_PASSWORD="your-strong-password"; node server.js
+
+  # Linux / macOS:
+  APP_PASSWORD="your-strong-password" node server.js
+  ```
+- **ב-Render / Vercel / Railway / Docker**:
+  הוסף משתנה סביבה (Environment Variable) בשם `APP_PASSWORD` עם הסיסמה הרצויה.
+
+כאשר משתנה זה מוגדר:
+1. כניסה לאתר תציג מסך התחברות מעוצב הדורש הזנת הסיסמה.
+2. נתיב ה-`/proxy` מוגן לחלוטין וידרוש אימות (Cookie, כותרת `X-App-Password`, או פרמטר `?auth=`).
+3. בהגדרות האפליקציה (⚙️) ניתן לשמור את סיסמת ה-`APP_PASSWORD` או להתנתק באמצעות כפתור ההתנתקות (🔒).

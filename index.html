@@ -70,6 +70,7 @@
             </div>
         </div>
         <div class="flex items-center space-x-2 space-x-reverse flex-shrink-0">
+            <button id="btn-logout" onclick="logoutApp()" class="hidden bg-slate-800 hover:bg-red-950/60 text-slate-300 hover:text-red-400 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-700 hover:border-red-800 transition flex items-center gap-1 active:scale-95" title="התנתק מהמערכת"><span>🔒</span><span class="hidden sm:inline">התנתק</span></button>
             <button onclick="openHiddenManager()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1 active:scale-95" title="אריחים מוסתרים">
                 <span>🗑️</span>
                 <span class="hidden sm:inline">מוסתרים</span>
@@ -189,6 +190,11 @@
                     <input type="text" id="cfg-proxy" placeholder="ברירת מחדל: /proxy" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
                     <p class="text-[11px] text-slate-400 mt-1">השאר ריק אם האתר מותקן יחד עם השרת (למשל Render או שרת מקומי). אם האתר מאוחסן בנפרד (כגון GitHub Pages), הזן את כתובת הפרוקסי ב-Render (לדוגמה: <span class="text-slate-300">https://my-proxy.onrender.com/proxy</span>).</p>
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-cyan-400 mb-1">סיסמת אפליקציה (APP_PASSWORD - אופציונלי)</label>
+                    <input type="password" id="cfg-app-pass" placeholder="הזן אם שרת הפרוקסי מוגן בסיסמה" class="w-full bg-slate-950 border border-slate-800 text-white p-2.5 rounded-xl text-base sm:text-sm focus:outline-none focus:border-cyan-500" dir="ltr">
+                    <p class="text-[11px] text-slate-400 mt-1">אם הוגדרה סיסמה בשרת, היא תצורף אוטומטית לבקשות הפרוקסי.</p>
+                </div>
             </div>
             <div class="mt-6 flex justify-between items-center">
                 <button onclick="resetAccountData()" class="text-xs text-red-400 hover:text-red-300 underline">אפס נתונים</button>
@@ -227,6 +233,8 @@
             document.getElementById('cfg-user').value = user;
             document.getElementById('cfg-pass').value = pass;
             document.getElementById('cfg-proxy').value = proxy;
+            document.getElementById('cfg-app-pass').value = localStorage.getItem('iptv_app_pass') || '';
+            checkAuthStatus();
 
             updateHiddenCount();
             setupPlayerTouchGestures();
@@ -254,6 +262,7 @@
             localStorage.setItem('iptv_user', document.getElementById('cfg-user').value.trim());
             localStorage.setItem('iptv_pass', document.getElementById('cfg-pass').value.trim());
             localStorage.setItem('iptv_proxy', proxy);
+            localStorage.setItem('iptv_app_pass', document.getElementById('cfg-app-pass').value.trim());
 
             closeModal();
             initApp();
@@ -270,7 +279,35 @@
             let proxyBase = localStorage.getItem('iptv_proxy') || '/proxy';
             if (!proxyBase.trim()) proxyBase = '/proxy';
             const separator = proxyBase.includes('?') ? '&' : '?';
-            return `${proxyBase}${separator}url=${encodeURIComponent(targetUrl)}`;
+            let url = `${proxyBase}${separator}url=${encodeURIComponent(targetUrl)}`;
+            const appPass = localStorage.getItem('iptv_app_pass');
+            if (appPass) {
+                url += `&auth=${encodeURIComponent(appPass)}`;
+            }
+            return url;
+        }
+
+        async function checkAuthStatus() {
+            try {
+                const res = await fetch('/api/auth/status');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.protected && data.authenticated) {
+                        const logoutBtn = document.getElementById('btn-logout');
+                        if (logoutBtn) logoutBtn.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {}
+        }
+
+        async function logoutApp() {
+            if (confirm('האם ברצונך להתנתק מהמערכת?')) {
+                try {
+                    await fetch('/api/auth/logout', { method: 'POST' });
+                } catch (e) {}
+                localStorage.removeItem('iptv_app_pass');
+                window.location.reload();
+            }
         }
 
         function showStatus(msg) {
@@ -293,6 +330,18 @@
             try {
                 let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
                 const catRes = await fetch(getProxyUrl(`${server}/player_api.php?username=${user}&password=${pass}&action=${catAction}`));
+                if (catRes.status === 401) {
+                    document.getElementById('grid-container').innerHTML = `
+                        <div class="text-center text-amber-400 py-10 col-span-full">
+                            <p class="font-bold mb-2 text-base">🔒 נדרשת סיסמת גישה למערכת (401 Unauthorized)</p>
+                            <p class="text-xs text-slate-400 mb-4">שרת הפרוקסי מוגן באמצעות APP_PASSWORD. הזן את הסיסמה בהגדרות או התחבר מחדש.</p>
+                            <div class="flex justify-center gap-3">
+                                <button onclick="openModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl text-cyan-400">פתח הגדרות</button>
+                                <button onclick="location.reload()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-xs rounded-xl text-white font-semibold">התחבר מחדש</button>
+                            </div>
+                        </div>`;
+                    return;
+                }
                 categories = await catRes.json();
 
                 let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
