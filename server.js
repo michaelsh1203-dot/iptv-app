@@ -32,9 +32,9 @@ app.use('/proxy', async (req, res) => {
 
         const response = await fetch(targetUrl, fetchOptions);
 
-        // Prevent forwarding 511 to avoid client auth loops
+        // Normalize non-standard or error status codes to prevent client/proxy loops
         let status = response.status;
-        if (status === 511) {
+        if (!status || status < 100 || status > 599 || status === 511) {
             status = 500;
         }
 
