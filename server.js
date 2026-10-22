@@ -27,12 +27,15 @@ app.use('/proxy', (req, res) => {
                 'Accept': '*/*'
             }
         }, (proxyRes) => {
-            let status = proxyRes.statusCode;
-            if (!status || status < 100 || status > 599) {
-                status = 500;
+            // If the upstream IPTV server returns an error, return a safe empty JSON array instead of 500
+            if (proxyRes.statusCode !== 200) {
+                console.warn(`Upstream server returned status ${proxyRes.statusCode} for URL: ${targetUrl}`);
+                if (!res.headersSent) {
+                    return res.status(200).json([]);
+                }
             }
 
-            res.status(status);
+            res.status(200);
             
             Object.keys(proxyRes.headers).forEach((key) => {
                 const lowerKey = key.toLowerCase();
@@ -47,7 +50,6 @@ app.use('/proxy', (req, res) => {
         proxyReq.on('error', (err) => {
             console.error('Proxy Request Error:', err.message);
             if (!res.headersSent) {
-                // Return a graceful fallback JSON instead of crashing with 500
                 res.status(200).json([]);
             }
         });
