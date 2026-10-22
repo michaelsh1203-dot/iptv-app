@@ -17,7 +17,7 @@ app.use('/proxy', (req, res) => {
     try {
         const client = targetUrl.startsWith('https') ? https : http;
         
-        client.get(targetUrl, {
+        const proxyReq = client.get(targetUrl, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
@@ -36,7 +36,9 @@ app.use('/proxy', (req, res) => {
             });
 
             proxyRes.pipe(res);
-        }).on('error', (err) => {
+        });
+
+        proxyReq.on('error', (err) => {
             console.error('Proxy Request Error:', err.message);
             res.status(500).json({ error: 'Proxy request failed', details: err.message });
         });
