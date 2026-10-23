@@ -54,7 +54,7 @@
                 statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
                 console.log("Starting fetch to /api/channels...");
                 
-                const res = await fetch('/api/channels');
+               const res = await fetch('/api/channels?v=2');
                 console.log("Fetch response status:", res.status);
                 
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
