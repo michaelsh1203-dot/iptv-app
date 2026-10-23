@@ -39,7 +39,7 @@
     </main>
 
     <script>
-        let hls = new Hls();
+        let hls = null;
         let allChannels = [];
 
         function getProxyUrl(target) {
@@ -48,23 +48,25 @@
 
         async function initApp() {
             try {
-                document.getElementById('status-msg').innerText = 'טוען ערוצים מהשרת המאובטח...';
+                const statusEl = document.getElementById('status-msg');
+                if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת המאובטח...';
                 
                 const res = await fetch('/api/channels');
-                if (!res.ok) throw new Error('שגיאה בטעינת הנתונים מהשרת');
+                if (!res.ok) throw new Error('שגיאה בטעינת הנתונים');
                 
                 const text = await res.text();
                 allChannels = parseM3U(text);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
-                    document.getElementById('status-msg').innerText = `נטענו בהצלחה ${allChannels.length} ערוצים`;
+                    if (statusEl) statusEl.innerText = `נטענו בהצלחה ${allChannels.length} ערוצים`;
                 } else {
-                    document.getElementById('status-msg').innerText = 'השרת לא החזיר ערוצים זמינים';
+                    if (statusEl) statusEl.innerText = 'השרת לא החזיר ערוצים זמינים';
                 }
             } catch (err) {
                 console.error('Error fetching channels:', err);
-                document.getElementById('status-msg').innerText = 'שגיאה בהתחברות לשרת';
+                const statusEl = document.getElementById('status-msg');
+                if (statusEl) statusEl.innerText = 'שגיאה בהתחברות לשרת';
             }
         }
 
@@ -89,6 +91,7 @@
 
         function renderChannels(channels) {
             const container = document.getElementById('grid-container');
+            if (!container) return;
             container.innerHTML = '';
 
             channels.forEach((ch) => {
@@ -125,7 +128,7 @@
             }
         }
 
-        window.onload = initApp;
+        window.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>

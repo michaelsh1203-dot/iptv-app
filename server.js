@@ -12,6 +12,7 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
+// נתיב מאובטח שמחזיר את רשימת ה-M3U ישירות מהשרת של הספק
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
     
@@ -47,6 +48,7 @@ app.get('/api/channels', (req, res) => {
     });
 });
 
+// פרוקסי להזרמת הסטרימים עצמם
 app.use('/proxy', (req, res) => {
     let targetUrl = req.query.url;
     if (!targetUrl) {
