@@ -11,9 +11,9 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// API לשליפת רשימת הערוצים משרת הספק
+// API לשליפת רשימת הערוצים משרת הספק (תיקון ל-get_live_streams)
 app.get('/api/channels', (req, res) => {
-    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_channels`;
+    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
     
     http.get(targetUrl, (externalRes) => {
         let data = '';
@@ -52,7 +52,7 @@ app.get('/proxy', (req, res) => {
     });
 });
 
-// שליחת קובץ ה-app.html הראשי עבור כל שאר הנתיבים (הקובץ נמצא באותה תיקייה ראשית)
+// שליחת קובץ ה-app.html הראשי
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'app.html'));
 });
