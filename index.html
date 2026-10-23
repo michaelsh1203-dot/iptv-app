@@ -14,24 +14,26 @@
         <h1 class="text-xl font-bold text-cyan-400 flex items-center gap-2">
             📺 IPTV Player
         </h1>
-        <div class="flex items-center gap-2">
-            <button onclick="loadChannels()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold transition shadow-lg cursor-pointer">
+        <div>
+            <button onclick="loadChannels()" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-base font-bold transition shadow-lg cursor-pointer">
                 ▶ טען ערוצים עכשיו
             </button>
         </div>
     </header>
 
-    <!-- Main Player & Grid Layout -->
+    <!-- Main Content -->
     <main class="flex-1 p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
-        <!-- Player Container -->
+        <!-- Player -->
         <div class="lg:col-span-2 flex flex-col gap-3">
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">טוען...</div>
+            <div id="status-msg" class="text-sm text-cyan-400 font-bold bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
+                לחץ על כפתור "טען ערוצים עכשיו" למעלה כדי להציג את הרשימה
+            </div>
         </div>
 
-        <!-- Channels Container -->
+        <!-- Channels List -->
         <div class="bg-slate-800/50 rounded-2xl border border-slate-700/50 p-4 flex flex-col gap-3 h-[600px]">
             <input type="text" id="search-input" oninput="filterChannels()" placeholder="חיפוש ערוץ..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-cyan-500">
             <div id="grid-container" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
@@ -48,13 +50,18 @@
 
         async function loadChannels() {
             const statusEl = document.getElementById('status-msg');
+            const container = document.getElementById('grid-container');
+            
             try {
-                if (statusEl) statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
+                statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
+                console.log("Fetching /api/channels...");
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
+                console.log("Data received:", data);
+
                 let rawList = Array.isArray(data) ? data : Object.values(data);
 
                 allChannels = rawList.map(item => ({
@@ -62,15 +69,17 @@
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
                 })).filter(ch => ch.url && !ch.url.includes('undefined'));
 
+                console.log("Parsed channels count:", allChannels.length);
+
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
-                    if (statusEl) statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
+                    statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    if (statusEl) statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
+                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
-                console.error('Error loading channels:', err);
-                if (statusEl) statusEl.innerText = `❌ שגיאה: ${err.message}`;
+                console.error('Error:', err);
+                statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
 
@@ -103,7 +112,7 @@
 
             const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
-            if (statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
+            statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
             if (Hls.isSupported()) {
                 hls = new Hls();
@@ -111,16 +120,14 @@
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
-                    if (statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
+                    statusEl.innerText = '▶ מנגן בהצלחה!';
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
-                if (statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
+                statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
-
-        document.addEventListener('DOMContentLoaded', loadChannels);
-    </script> 
+    </script>
 </body>
 </html>
