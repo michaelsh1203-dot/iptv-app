@@ -13,14 +13,15 @@ const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
 app.get('/api/channels', (req, res) => {
-    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
+    // מנסים כעת פורמט m3u רגיל במקום m3u_plus כדי לעקוף את שגיאת הספק
+    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u`;
     console.log("Fetching from IPTV provider:", targetUrl);
     
     const client = targetUrl.startsWith('https') ? https : http;
     
     const proxyReq = client.get(targetUrl, {
         headers: {
-            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': '*/*'
         }
     }, (proxyRes) => {
