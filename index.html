@@ -133,7 +133,7 @@
             }
 
             // Using get.php format supported by the provider
-            const apiUrl = `${server}/get.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&type=m3u_plus&output=ts`;
+            const apiUrl = `${server}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`;
             const proxyUrl = getProxyUrl(apiUrl);
 
             try {
