@@ -12,7 +12,6 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// השרת שולף את ה-JSON מהספק, מפענח אותו ומחזיר מערך נקי ל-Frontend
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
     
@@ -31,11 +30,26 @@ app.get('/api/channels', (req, res) => {
 
         proxyRes.on('end', () => {
             try {
-                const jsonData = JSON.parse(rawData);
+                const jsonParsed = JSON.parse(rawData);
+                
+                // ודא שאנחנו מחזירים מערך נקי תמיד ללקוח
+                let channelsArray = [];
+                if (Array.isArray(jsonParsed)) {
+                    channelsArray = jsonParsed;
+                } else if (jsonParsed && typeof jsonParsed === 'object') {
+                    // אם זה אובייקט מעטפת, נמצא את המערך בפנים או נמיר את הערכים
+                    const foundKey = Object.keys(jsonParsed).find(k => Array.isArray(jsonParsed[k]));
+                    if (foundKey) {
+                        channelsArray = jsonParsed[foundKey];
+                    } else {
+                        channelsArray = Object.values(jsonParsed);
+                    }
+                }
+
                 res.setHeader('Content-Type', 'application/json');
-                res.status(200).json(jsonData);
+                res.status(200).json(channelsArray);
             } catch (e) {
-                res.status(500).json({ error: 'Failed to parse JSON from provider', raw: rawData.substring(0, 100) });
+                res.status(500).json({ error: 'Failed to parse JSON' });
             }
         });
     });
