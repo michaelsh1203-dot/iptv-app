@@ -12,10 +12,10 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
+// נתיב לשליפת הערוצים בצורה ישירה וחסינה
 app.get('/api/channels', (req, res) => {
-    // מעבר ל-Xtream API רשמי שמחזיר את רשימת הערוצים בפורמט JSON
-    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
-    console.log("Fetching from IPTV API:", targetUrl);
+    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
+    console.log("Fetching M3U from IPTV provider:", targetUrl);
     
     const client = targetUrl.startsWith('https') ? https : http;
     
@@ -27,13 +27,7 @@ app.get('/api/channels', (req, res) => {
     }, (proxyRes) => {
         console.log("IPTV Response Status:", proxyRes.statusCode);
         
-        if (proxyRes.statusCode !== 200) {
-            if (!res.headersSent) {
-                return res.status(500).send(`Provider error: ${proxyRes.statusCode}`);
-            }
-        }
-
-        res.status(200);
+        res.status(proxyRes.statusCode);
         Object.keys(proxyRes.headers).forEach((key) => {
             const lowerKey = key.toLowerCase();
             if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(lowerKey)) {
