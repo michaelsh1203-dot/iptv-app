@@ -28,7 +28,7 @@
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">לחץ על כפתור "טען ערוצים עכשיו" למעלה</div>
+            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">טוען...</div>
         </div>
 
         <!-- Channels Container -->
@@ -38,7 +38,7 @@
         </div>
     </main>
 
-  <script>
+    <script>
         let hls = null;
         let allChannels = [];
         
@@ -48,32 +48,29 @@
 
         async function loadChannels() {
             const statusEl = document.getElementById('status-msg');
-            
             try {
-                statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
+                if (statusEl) statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Channels Data:", data);
-
                 let rawList = Array.isArray(data) ? data : Object.values(data);
 
                 allChannels = rawList.map(item => ({
-                    name: item.name || 'ערוץ ללא שם',
-                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
+                    name: item.name || item.title || 'ערוץ ללא שם',
+                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
                 })).filter(ch => ch.url && !ch.url.includes('undefined'));
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
-                    statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
+                    if (statusEl) statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
+                    if (statusEl) statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
                 console.error('Error loading channels:', err);
-                statusEl.innerText = `❌ שגיאה: ${err.message}`;
+                if (statusEl) statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
 
@@ -106,7 +103,7 @@
 
             const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
-            statusEl.innerText = '▶ טוען ניגון ערוץ...';
+            if (statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
             if (Hls.isSupported()) {
                 hls = new Hls();
@@ -114,17 +111,16 @@
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
-                    statusEl.innerText = '▶ מנגן בהצלחה!';
+                    if (statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
-                statusEl.innerText = '▶ מנגן בהצלחה!';
+                if (statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
 
-        // הפעלה אוטומטית מיד כשהדף נטען
-        loadChannels();
+        document.addEventListener('DOMContentLoaded', loadChannels);
     </script> 
 </body>
 </html>
