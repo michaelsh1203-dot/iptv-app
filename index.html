@@ -55,10 +55,15 @@
                 if (!res.ok) throw new Error('שגיאה בטעינת הנתונים');
                 
                 const data = await res.json();
+                console.log("Loaded channels data:", data);
+
+                if (!Array.isArray(data)) {
+                    throw new Error('הנתונים שהתקבלו אינם תקינים');
+                }
                 
                 allChannels = data.map(item => ({
                     name: item.name || 'ערוץ ללא שם',
-                    url: `/proxy?url=${encodeURIComponent(`${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`)}`
+                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
                 }));
 
                 if (allChannels.length > 0) {
@@ -102,13 +107,16 @@
                 hls = null;
             }
 
+            // שימוש בפרוקסי של השרת עבור ניגון הסטרים עצמו
+            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+
             if (Hls.isSupported()) {
                 hls = new Hls();
-                hls.loadSource(url);
+                hls.loadSource(proxyUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(e => console.log('Autoplay blocked')));
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
             }
         }
