@@ -8,6 +8,51 @@ const PORT = process.env.PORT || 10000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// פרטי ספק ה-IPTV מוגדרים בצד השרת בלבד (מאובטח לחלוטין)
+const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
+const IPTV_USER = 'd48e6682bdb8';
+const IPTV_PASS = 'a6af461b63';
+
+// נתיב מאובטח לשליפת הערוצים ישירות מול הספק
+app.get('/api/channels', (req, res) => {
+    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
+    
+    const client = targetUrl.startsWith('https') ? https : http;
+    
+    const proxyReq = client.get(targetUrl, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': '*/*'
+        }
+    }, (proxyRes) => {
+        if (proxyRes.statusCode !== 200) {
+            console.warn(`Upstream server returned status ${proxyRes.statusCode}`);
+            if (!res.headersSent) {
+                return res.status(200).json([]);
+            }
+        }
+
+        res.status(200);
+        
+        Object.keys(proxyRes.headers).forEach((key) => {
+            const lowerKey = key.toLowerCase();
+            if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(lowerKey)) {
+                res.setHeader(key, proxyRes.headers[key]);
+            }
+        });
+
+        proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+        console.error('Proxy Request Error:', err.message);
+        if (!res.headersSent) {
+            res.status(200).json([]);
+        }
+    });
+});
+
+// פרוקסי כללי להזרמת ניגון ערוצים (וידאו/סטרימים)
 app.use('/proxy', (req, res) => {
     let targetUrl = req.query.url;
     if (!targetUrl) {
@@ -19,19 +64,6 @@ app.use('/proxy', (req, res) => {
             targetUrl = decodeURIComponent(targetUrl);
         }
 
-        // תיקון אוטומטי: אם הבקשה מגיעה ל-get.php, נמיר אותה לפורמט ה-API של Xtream כדי למנוע שגיאת 884
-        if (targetUrl.includes('/get.php')) {
-            // חילוץ פרטי השרת והמשתמש כדי לבנות כתובת player_api תקינה
-            const urlObj = new URL(targetUrl);
-            const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
-            const params = new URLSearchParams(urlObj.search);
-            const username = params.get('username');
-            const password = params.get('password');
-            if (username && password) {
-                targetUrl = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_live_streams`;
-            }
-        }
-
         const client = targetUrl.startsWith('https') ? https : http;
         
         const proxyReq = client.get(targetUrl, {
@@ -40,36 +72,25 @@ app.use('/proxy', (req, res) => {
                 'Accept': '*/*'
             }
         }, (proxyRes) => {
-            if (proxyRes.statusCode !== 200) {
-                console.warn(`Upstream server returned status ${proxyRes.statusCode} for URL: ${targetUrl}`);
-                if (!res.headersSent) {
-                    return res.status(200).json([]);
-                }
-            }
-
             res.status(200);
-            
             Object.keys(proxyRes.headers).forEach((key) => {
                 const lowerKey = key.toLowerCase();
                 if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(lowerKey)) {
                     res.setHeader(key, proxyRes.headers[key]);
                 }
             });
-
             proxyRes.pipe(res);
         });
 
         proxyReq.on('error', (err) => {
-            console.error('Proxy Request Error:', err.message);
+            console.error('Stream Proxy Error:', err.message);
             if (!res.headersSent) {
-                res.status(200).json([]);
+                res.status(500).send('Proxy error');
             }
         });
-
     } catch (err) {
-        console.error('Server Error:', err.message);
         if (!res.headersSent) {
-            res.status(200).json([]);
+            res.status(500).send('Server error');
         }
     }
 });
