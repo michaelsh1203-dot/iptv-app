@@ -38,7 +38,7 @@
         </div>
     </main>
 
-    <script>
+  <script>
         let hls = null;
         let allChannels = [];
         
@@ -48,39 +48,28 @@
 
         async function loadChannels() {
             const statusEl = document.getElementById('status-msg');
-            const container = document.getElementById('grid-container');
             
             try {
-                statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
-                console.log("Starting fetch to /api/channels...");
+                statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
                 
-               const res = await fetch('/api/channels?v=2');
-                console.log("Fetch response status:", res.status);
-                
+                const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Data received in frontend:", data);
+                console.log("Channels Data:", data);
 
-                let rawList = [];
-                if (Array.isArray(data)) {
-                    rawList = data;
-                } else if (data && typeof data === 'object') {
-                    rawList = Object.values(data);
-                }
+                let rawList = Array.isArray(data) ? data : Object.values(data);
 
                 allChannels = rawList.map(item => ({
                     name: item.name || 'ערוץ ללא שם',
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
-                })).filter(ch => ch.url && ch.url.includes(IPTV_USER));
-
-                console.log("Processed channels count:", allChannels.length);
+                })).filter(ch => ch.url && !ch.url.includes('undefined'));
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה או לא תקינה';
+                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
                 console.error('Error loading channels:', err);
@@ -134,10 +123,8 @@
             }
         }
 
-        // טעינה אוטומטית בעליית הדף
-        window.onload = () => {
-            loadChannels();
-        };
-    </script>
+        // הפעלה אוטומטית מיד כשהדף נטען
+        loadChannels();
+    </script> 
 </body>
 </html>
