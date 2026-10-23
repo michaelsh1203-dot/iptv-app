@@ -8,12 +8,10 @@ const PORT = process.env.PORT || 10000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// פרטי ספק ה-IPTV מאובטחים בצד השרת בלבד
 const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// נתיב מאובטח לשליפת רשימת הערוצים בפורמט M3U (יציב לחלוטין מול ספקי Xtream)
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
     
@@ -26,14 +24,12 @@ app.get('/api/channels', (req, res) => {
         }
     }, (proxyRes) => {
         if (proxyRes.statusCode !== 200) {
-            console.warn(`Upstream server returned status ${proxyRes.statusCode}`);
             if (!res.headersSent) {
                 return res.status(200).send('');
             }
         }
 
         res.status(200);
-        
         Object.keys(proxyRes.headers).forEach((key) => {
             const lowerKey = key.toLowerCase();
             if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(lowerKey)) {
@@ -45,14 +41,12 @@ app.get('/api/channels', (req, res) => {
     });
 
     proxyReq.on('error', (err) => {
-        console.error('Proxy Request Error:', err.message);
         if (!res.headersSent) {
             res.status(200).send('');
         }
     });
 });
 
-// פרוקסי להזרמת הסטרימים עצמם
 app.use('/proxy', (req, res) => {
     let targetUrl = req.query.url;
     if (!targetUrl) {
@@ -83,7 +77,6 @@ app.use('/proxy', (req, res) => {
         });
 
         proxyReq.on('error', (err) => {
-            console.error('Stream Proxy Error:', err.message);
             if (!res.headersSent) {
                 res.status(500).send('Proxy error');
             }
