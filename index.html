@@ -15,7 +15,7 @@
             📺 IPTV Player
         </h1>
         <div class="flex items-center gap-2">
-            <button onclick="initApp()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold transition shadow-lg">
+            <button onclick="loadChannels()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold transition shadow-lg cursor-pointer">
                 ▶ טען ערוצים עכשיו
             </button>
         </div>
@@ -28,7 +28,7 @@
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">טוען נתונים...</div>
+            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">לחץ על כפתור "טען ערוצים עכשיו" למעלה</div>
         </div>
 
         <!-- Channels Container -->
@@ -46,33 +46,44 @@
         const IPTV_USER = 'd48e6682bdb8';
         const IPTV_PASS = 'a6af461b63';
 
-        async function initApp() {
+        async function loadChannels() {
             const statusEl = document.getElementById('status-msg');
+            const container = document.getElementById('grid-container');
+            
             try {
-                statusEl.innerText = '🔄 מעבד נתוני ערוצים...';
+                statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
+                console.log("Starting fetch to /api/channels...");
                 
                 const res = await fetch('/api/channels');
+                console.log("Fetch response status:", res.status);
+                
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
-                // שימוש מפורש ב-.json() כדי לפענח את התשובה כהלכה
                 const data = await res.json();
-                console.log("Parsed channels array length:", Array.isArray(data) ? data.length : "Not array");
+                console.log("Data received in frontend:", data);
 
-                let channelsList = Array.isArray(data) ? data : Object.values(data);
+                let rawList = [];
+                if (Array.isArray(data)) {
+                    rawList = data;
+                } else if (data && typeof data === 'object') {
+                    rawList = Object.values(data);
+                }
 
-                allChannels = channelsList.map(item => ({
+                allChannels = rawList.map(item => ({
                     name: item.name || 'ערוץ ללא שם',
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
-                })).filter(ch => ch.url && !ch.url.includes('undefined'));
+                })).filter(ch => ch.url && ch.url.includes(IPTV_USER));
+
+                console.log("Processed channels count:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
+                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה או לא תקינה';
                 }
             } catch (err) {
-                console.error('Error in initApp:', err);
+                console.error('Error loading channels:', err);
                 statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
@@ -84,7 +95,7 @@
 
             channels.forEach((ch) => {
                 const btn = document.createElement('button');
-                btn.className = 'w-full text-right p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition border border-slate-700/50 flex items-center justify-between group';
+                btn.className = 'w-full text-right p-3 bg-slate-800 hover:bg-slate-700 rounded-xl transition border border-slate-700/50 flex items-center justify-between group cursor-pointer';
                 btn.innerHTML = `<span class="font-medium text-sm text-slate-200 group-hover:text-cyan-400">${ch.name}</span><span class="text-xs text-cyan-400">▶ נגן</span>`;
                 btn.onclick = () => playStream(ch.url);
                 container.appendChild(btn);
@@ -124,7 +135,9 @@
         }
 
         // טעינה אוטומטית בעליית הדף
-        window.addEventListener('DOMContentLoaded', initApp);
+        window.onload = () => {
+            loadChannels();
+        };
     </script>
 </body>
 </html>
