@@ -29,7 +29,7 @@
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
             <div id="status-msg" class="text-sm text-cyan-400 font-bold bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
-                לחץ על כפתור "טען ערוצים עכשיו" למעלה כדי להציג את הרשימה
+                טוען ערוצים אוטומטית...
             </div>
         </div>
 
@@ -41,6 +41,7 @@
     </main>
 
     <script>
+        console.log("Script loaded successfully!");
         let hls = null;
         let allChannels = [];
         
@@ -49,14 +50,15 @@
         const IPTV_PASS = 'a6af461b63';
 
         async function loadChannels() {
+            console.log("loadChannels() called!");
             const statusEl = document.getElementById('status-msg');
             const container = document.getElementById('grid-container');
             
             try {
-                statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
-                console.log("Fetching /api/channels...");
+                if(statusEl) statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
                 
                 const res = await fetch('/api/channels');
+                console.log("Fetch response status:", res.status);
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
@@ -73,13 +75,13 @@
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
-                    statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
+                    if(statusEl) statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
+                    if(statusEl) statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
-                console.error('Error:', err);
-                statusEl.innerText = `❌ שגיאה: ${err.message}`;
+                console.error('Error in loadChannels:', err);
+                if(statusEl) statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
 
@@ -112,7 +114,7 @@
 
             const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
-            statusEl.innerText = '▶ טוען ניגון ערוץ...';
+            if(statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
             if (Hls.isSupported()) {
                 hls = new Hls();
@@ -120,14 +122,20 @@
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
-                    statusEl.innerText = '▶ מנגן בהצלחה!';
+                    if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
-                statusEl.innerText = '▶ מנגן בהצלחה!';
+                if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
+
+        // טעינה אוטומטית מיד בעליית הדף
+        window.onload = function() {
+            console.log("Window loaded, calling loadChannels...");
+            loadChannels();
+        };
     </script>
 </body>
 </html>
