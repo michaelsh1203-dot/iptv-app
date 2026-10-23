@@ -14,6 +14,8 @@ const IPTV_PASS = 'a6af461b63';
 
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
+    console.log("Fetching from IPTV provider:", targetUrl);
+    
     const client = targetUrl.startsWith('https') ? https : http;
     
     const proxyReq = client.get(targetUrl, {
@@ -22,9 +24,11 @@ app.get('/api/channels', (req, res) => {
             'Accept': '*/*'
         }
     }, (proxyRes) => {
+        console.log("IPTV Response Status:", proxyRes.statusCode);
+        
         if (proxyRes.statusCode !== 200) {
             if (!res.headersSent) {
-                return res.status(200).send('');
+                return res.status(500).send(`Provider error: ${proxyRes.statusCode}`);
             }
         }
 
@@ -40,8 +44,9 @@ app.get('/api/channels', (req, res) => {
     });
 
     proxyReq.on('error', (err) => {
+        console.error("IPTV Request Error:", err.message);
         if (!res.headersSent) {
-            res.status(200).send('');
+            res.status(500).send('Proxy request error');
         }
     });
 });
