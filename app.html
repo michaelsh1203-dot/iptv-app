@@ -52,18 +52,28 @@
             const statusEl = document.getElementById('status-msg');
             
             try {
-                if(statusEl) statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
+                if(statusEl) statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                let rawList = Array.isArray(data) ? data : Object.values(data);
+                console.log("Raw data from server:", data);
+
+                let rawList = [];
+                if (Array.isArray(data)) {
+                    rawList = data;
+                } else if (data && typeof data === 'object') {
+                    const foundKey = Object.keys(data).find(k => Array.isArray(data[k]));
+                    rawList = foundKey ? data[foundKey] : Object.values(data);
+                }
 
                 allChannels = rawList.map(item => ({
                     name: item.name || item.title || 'ערוץ ללא שם',
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
                 })).filter(ch => ch.url && !ch.url.includes('undefined'));
+
+                console.log("Processed channels:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
@@ -72,7 +82,7 @@
                     if(statusEl) statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
-                console.error('Error:', err);
+                console.error('Error loading channels:', err);
                 if(statusEl) statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
