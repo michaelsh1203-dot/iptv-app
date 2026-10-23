@@ -114,20 +114,25 @@
                 hls = null;
             }
 
-            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
             if(statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
+            console.log("Playing stream URL:", url);
+
             if (Hls.isSupported()) {
                 hls = new Hls();
-                hls.loadSource(proxyUrl);
+                hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
                     if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
                 });
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    console.error('HLS error:', data);
+                    if(statusEl) statusEl.innerText = '❌ שגיאה בניגון הזרם';
+                });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = proxyUrl;
+                video.src = url;
                 video.play().catch(e => console.log('Autoplay blocked'));
                 if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
             }
