@@ -28,7 +28,7 @@
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-xs text-slate-400 min-h-[20px]"></div>
+            <div id="status-msg" class="text-xs text-slate-400 min-h-[20px]">טוען מערכת...</div>
         </div>
 
         <!-- Channels Container -->
@@ -47,18 +47,21 @@
         const IPTV_PASS = 'a6af461b63';
 
         async function initApp() {
+            const statusEl = document.getElementById('status-msg');
             try {
-                const statusEl = document.getElementById('status-msg');
                 if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת...';
+                console.log("Fetching /api/channels...");
                 
                 const res = await fetch('/api/channels');
-                if (!res.ok) throw new Error('שגיאה בטעינת הנתונים');
+                console.log("Response status:", res.status);
+                
+                if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Loaded channels data:", data);
+                console.log("Parsed channels data count:", Array.isArray(data) ? data.length : "Not an array");
 
                 if (!Array.isArray(data)) {
-                    throw new Error('הנתונים שהתקבלו אינם תקינים');
+                    throw new Error('הנתונים שהתקבלו אינם מערך תקין');
                 }
                 
                 allChannels = data.map(item => ({
@@ -73,9 +76,8 @@
                     if (statusEl) statusEl.innerText = 'השרת לא החזיר ערוצים זמינים';
                 }
             } catch (err) {
-                console.error('Error fetching channels:', err);
-                const statusEl = document.getElementById('status-msg');
-                if (statusEl) statusEl.innerText = 'שגיאה בהתחברות לשרת';
+                console.error('Error in initApp:', err);
+                if (statusEl) statusEl.innerText = `שגיאה: ${err.message}`;
             }
         }
 
@@ -107,7 +109,6 @@
                 hls = null;
             }
 
-            // שימוש בפרוקסי של השרת עבור ניגון הסטרים עצמו
             const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
 
             if (Hls.isSupported()) {
