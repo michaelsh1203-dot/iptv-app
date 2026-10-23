@@ -12,37 +12,36 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// שליפת רשימת הערוצים דרך Xtream API (מחזיר JSON נקי)
+// השרת שולף את ה-JSON מהספק, מפענח אותו ומחזיר מערך נקי ל-Frontend
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
-    console.log("Fetching from Xtream API:", targetUrl);
     
     const client = targetUrl.startsWith('https') ? https : http;
     
+    let rawData = '';
     const proxyReq = client.get(targetUrl, {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json'
         }
     }, (proxyRes) => {
-        console.log("IPTV API Response Status:", proxyRes.statusCode);
-        
-        res.status(proxyRes.statusCode);
-        Object.keys(proxyRes.headers).forEach((key) => {
-            const lowerKey = key.toLowerCase();
-            if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(lowerKey)) {
-                res.setHeader(key, proxyRes.headers[key]);
-            }
+        proxyRes.on('data', (chunk) => {
+            rawData += chunk;
         });
 
-        proxyRes.pipe(res);
+        proxyRes.on('end', () => {
+            try {
+                const jsonData = JSON.parse(rawData);
+                res.setHeader('Content-Type', 'application/json');
+                res.status(200).json(jsonData);
+            } catch (e) {
+                res.status(500).json({ error: 'Failed to parse JSON from provider', raw: rawData.substring(0, 100) });
+            }
+        });
     });
 
     proxyReq.on('error', (err) => {
-        console.error("IPTV API Error:", err.message);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to fetch channels' });
-        }
+        res.status(500).json({ error: err.message });
     });
 });
 
