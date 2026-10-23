@@ -15,8 +15,8 @@
             📺 IPTV Player
         </h1>
         <div class="flex items-center gap-2">
-            <button onclick="initApp()" class="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">
-                🔄 רענן ערוצים
+            <button onclick="initApp()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-lg text-sm font-bold transition shadow-lg">
+                ▶ טען ערוצים עכשיו
             </button>
         </div>
     </header>
@@ -28,7 +28,7 @@
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-xs text-cyan-400 font-medium min-h-[20px]">מאתחל מערכת...</div>
+            <div id="status-msg" class="text-sm text-cyan-400 font-bold min-h-[30px] bg-slate-800/80 p-3 rounded-lg border border-slate-700 text-center">לחץ על כפתור "טען ערוצים עכשיו" למעלה</div>
         </div>
 
         <!-- Channels Container -->
@@ -49,38 +49,45 @@
         async function initApp() {
             const statusEl = document.getElementById('status-msg');
             try {
-                if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת...';
+                statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                
-                // בדיקה אם הנתונים מגיעים כמערך או כאובייקט עטוף
-                let channelsArray = [];
+                console.log("Raw API Data received:", data);
+
+                let rawList = [];
                 if (Array.isArray(data)) {
-                    channelsArray = data;
-                } else if (data && Array.isArray(data.available_items)) {
-                    channelsArray = data.available_items;
+                    rawList = data;
                 } else if (data && typeof data === 'object') {
-                    // לפעמים Xtream מחזיר אובייקט שהמפתחות שלו הם מזהי הערוצים
-                    channelsArray = Object.values(data);
+                    rawList = Object.values(data);
                 }
 
-                allChannels = channelsArray.map(item => ({
-                    name: item.name || item.title || 'ערוץ ללא שם',
-                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
-                })).filter(ch => ch.url);
+                // מיפוי חסין שבודק את כל האפשרויות האפשריות לשמות השדות ב-API של הספק
+                allChannels = rawList.map(item => {
+                    const name = item.name || item.title || item.stream_display_name || 'ערוץ ללא שם';
+                    const streamId = item.stream_id || item.id || item.num;
+                    
+                    if (!streamId) return null;
+
+                    return {
+                        name: name,
+                        url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${streamId}.m3u8`
+                    };
+                }).filter(ch => ch !== null && ch.url);
+
+                console.log("Mapped channels count:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
-                    if (statusEl) statusEl.innerText = `נטענו בהצלחה ${allChannels.length} ערוצים`;
+                    statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    if (statusEl) statusEl.innerText = 'השרת לא החזיר ערוצים זמינים';
+                    statusEl.innerText = '⚠️ השרת החזיר נתונים אך ללא מזהי סטרים תקינים';
                 }
             } catch (err) {
                 console.error('Error in initApp:', err);
-                if (statusEl) statusEl.innerText = `שגיאה בטעינה: ${err.message}`;
+                statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
 
@@ -106,26 +113,29 @@
 
         function playStream(url) {
             const video = document.getElementById('video-player');
-
             if (hls) {
                 hls.destroy();
                 hls = null;
             }
 
             const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+            const statusEl = document.getElementById('status-msg');
+            statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
             if (Hls.isSupported()) {
                 hls = new Hls();
                 hls.loadSource(proxyUrl);
                 hls.attachMedia(video);
-                hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(e => console.log('Autoplay blocked')));
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(e => console.log('Autoplay blocked'));
+                    statusEl.innerText = '▶ מנגן בהצלחה!';
+                });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
+                statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
-
-        window.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
