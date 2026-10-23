@@ -41,47 +41,39 @@
     <script>
         let hls = null;
         let allChannels = [];
+        
+        const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
+        const IPTV_USER = 'd48e6682bdb8';
+        const IPTV_PASS = 'a6af461b63';
 
         async function initApp() {
             const statusEl = document.getElementById('status-msg');
             try {
-                statusEl.innerText = '🔄 טוען ומפענח רשימת ערוצים...';
+                statusEl.innerText = '🔄 טוען ערוצים מהשרת...';
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
-                const textData = await res.text();
-                
-                // פענוח קובץ M3U פשוט
-                const lines = textData.split('\n');
-                allChannels = [];
-                
-                let currentName = '';
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i].trim();
-                    if (line.startsWith('#EXTINF:')) {
-                        const parts = line.split(',');
-                        if (parts.length > 1) {
-                            currentName = parts.slice(1).join(',').trim();
-                        }
-                    } else if (line && !line.startsWith('#')) {
-                        if (currentName) {
-                            allChannels.push({
-                                name: currentName,
-                                url: line
-                            });
-                            currentName = '';
-                        }
-                    }
+                const data = await res.json();
+                console.log("API JSON data:", data);
+
+                let rawList = [];
+                if (Array.isArray(data)) {
+                    rawList = data;
+                } else if (data && typeof data === 'object') {
+                    rawList = Object.values(data);
                 }
 
-                console.log("Parsed M3U channels:", allChannels.length);
+                allChannels = rawList.map(item => ({
+                    name: item.name || item.title || 'ערוץ ללא שם',
+                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
+                })).filter(ch => ch.url && !ch.url.includes('undefined'));
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ לא נמצאו ערוצים בקובץ שהתקבל';
+                    statusEl.innerText = '⚠️ השרת החזיר נתונים ריקים';
                 }
             } catch (err) {
                 console.error('Error in initApp:', err);
