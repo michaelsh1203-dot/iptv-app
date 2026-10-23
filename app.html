@@ -114,14 +114,16 @@
                 hls = null;
             }
 
+            // שימוש בפרוקסי של השרת לעקיפת חסימת Mixed Content
+            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
             if(statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
 
-            console.log("Playing stream URL:", url);
+            console.log("Playing via Proxy URL:", proxyUrl);
 
             if (Hls.isSupported()) {
                 hls = new Hls();
-                hls.loadSource(url);
+                hls.loadSource(proxyUrl);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
@@ -132,7 +134,7 @@
                     if(statusEl) statusEl.innerText = '❌ שגיאה בניגון הזרם';
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = proxyUrl;
                 video.play().catch(e => console.log('Autoplay blocked'));
                 if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
             }
