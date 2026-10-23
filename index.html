@@ -41,21 +41,27 @@
     <script>
         let hls = null;
         let allChannels = [];
-
-        function getProxyUrl(target) {
-            return `/proxy?url=${encodeURIComponent(target)}`;
-        }
+        
+        // פרטי השרת ליצירת קישור הניגון הישיר
+        const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
+        const IPTV_USER = 'd48e6682bdb8';
+        const IPTV_PASS = 'a6af461b63';
 
         async function initApp() {
             try {
                 const statusEl = document.getElementById('status-msg');
-                if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת המאובטח...';
+                if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת...';
                 
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error('שגיאה בטעינת הנתונים');
                 
-                const text = await res.text();
-                allChannels = parseM3U(text);
+                const data = await res.json();
+                
+                // עיבוד נתוני ה-JSON של Xtream Codes
+                allChannels = data.map(item => ({
+                    name: item.name || 'ערוץ ללא שם',
+                    url: `/proxy?url=${encodeURIComponent(`${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`)}`
+                }));
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
@@ -68,25 +74,6 @@
                 const statusEl = document.getElementById('status-msg');
                 if (statusEl) statusEl.innerText = 'שגיאה בהתחברות לשרת';
             }
-        }
-
-        function parseM3U(data) {
-            const lines = data.split('\n');
-            const channels = [];
-            let currentChannel = {};
-
-            for (let line of lines) {
-                line = line.trim();
-                if (line.startsWith('#EXTINF:')) {
-                    const nameMatch = line.match(/,(.+)$/);
-                    currentChannel.name = nameMatch ? nameMatch[1] : 'ערוץ ללא שם';
-                } else if (line && !line.startsWith('#')) {
-                    currentChannel.url = getProxyUrl(line);
-                    channels.push({ ...currentChannel });
-                    currentChannel = {};
-                }
-            }
-            return channels;
         }
 
         function renderChannels(channels) {
