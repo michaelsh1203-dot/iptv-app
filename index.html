@@ -42,7 +42,6 @@
         let hls = null;
         let allChannels = [];
         
-        // פרטי השרת ליצירת קישור הניגון הישיר
         const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
         const IPTV_USER = 'd48e6682bdb8';
         const IPTV_PASS = 'a6af461b63';
@@ -57,7 +56,6 @@
                 
                 const data = await res.json();
                 
-                // עיבוד נתוני ה-JSON של Xtream Codes
                 allChannels = data.map(item => ({
                     name: item.name || 'ערוץ ללא שם',
                     url: `/proxy?url=${encodeURIComponent(`${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`)}`
