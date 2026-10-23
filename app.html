@@ -44,7 +44,8 @@
         let hls = null;
         let allChannels = [];
         
-        const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
+        // שימוש בכתובת המאובטחת https כדי למנוע חסימת Mixed Content בדפדפן
+        const IPTV_SERVER = 'https://thy30188.wd.business-cloud-8.ru';
         const IPTV_USER = 'd48e6682bdb8';
         const IPTV_PASS = 'a6af461b63';
 
@@ -114,16 +115,14 @@
                 hls = null;
             }
 
-            // שימוש בפרוקסי של השרת לעקיפת חסימת Mixed Content
-            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
             const statusEl = document.getElementById('status-msg');
-            if(statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ...';
+            if(statusEl) statusEl.innerText = '▶ טוען ניגון ערוץ ישירות...';
 
-            console.log("Playing via Proxy URL:", proxyUrl);
+            console.log("Playing direct URL:", url);
 
             if (Hls.isSupported()) {
                 hls = new Hls();
-                hls.loadSource(proxyUrl);
+                hls.loadSource(url);
                 hls.attachMedia(video);
                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                     video.play().catch(e => console.log('Autoplay blocked'));
@@ -134,14 +133,14 @@
                     if(statusEl) statusEl.innerText = '❌ שגיאה בניגון הזרם';
                 });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = proxyUrl;
+                video.src = url;
                 video.play().catch(e => console.log('Autoplay blocked'));
                 if(statusEl) statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
 
         // טעינה אוטומטית מיד כשעולה הדף
-        window.onload = loadChannels;
+    window.onload = loadChannels;
     </script>
 </body>
 </html>
