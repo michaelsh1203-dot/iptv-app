@@ -58,14 +58,14 @@
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Raw data from server:", data);
+                console.log("DATA FROM SERVER:", data);
 
                 let rawList = [];
                 if (Array.isArray(data)) {
                     rawList = data;
                 } else if (data && typeof data === 'object') {
-                    const foundKey = Object.keys(data).find(k => Array.isArray(data[k]));
-                    rawList = foundKey ? data[foundKey] : Object.values(data);
+                    const firstArrayKey = Object.keys(data).find(k => Array.isArray(data[k]));
+                    rawList = firstArrayKey ? data[firstArrayKey] : Object.values(data);
                 }
 
                 allChannels = rawList.map(item => ({
@@ -73,7 +73,7 @@
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
                 })).filter(ch => ch.url && !ch.url.includes('undefined'));
 
-                console.log("Processed channels:", allChannels.length);
+                console.log("PROCESSED CHANNELS:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
