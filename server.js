@@ -81,7 +81,7 @@ app.use('/proxy', (req, res) => {
 });
 
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
 
 app.listen(PORT, () => {
