@@ -1,6 +1,6 @@
 /**
  * IPTV Web Player - Frontend Client JavaScript (app.js)
- * Fully dynamic IPTV provider management with graceful fallbacks and proxy routing
+ * Fully dynamic IPTV provider management with advanced debugging and fallbacks
  */
 
 const DEFAULT_PROVIDER = {
@@ -66,9 +66,9 @@ function showStatus(msg) {
 }
 
 async function initApp() {
+    console.log("initApp started...");
     const { server, user, pass } = getIptvCredentials();
     
-    // Save defaults to storage if empty
     if (!localStorage.getItem('iptv_server')) {
         localStorage.setItem('iptv_server', server);
         localStorage.setItem('iptv_user', user);
@@ -83,14 +83,17 @@ async function initApp() {
     try {
         let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
         const catApiUrl = buildApiUrl(catAction);
+        console.log("Fetching categories via proxy:", getProxyUrl(catApiUrl));
+        
         const catRes = await fetch(getProxyUrl(catApiUrl));
+        console.log("Categories response status:", catRes.status);
         
         let catData = [];
         if (catRes.ok) {
-            try { catData = await catRes.json(); } catch(e) {}
+            try { catData = await catRes.json(); } catch(e) { console.warn("Failed to parse categories JSON"); }
         }
+        console.log("Categories loaded data:", catData);
 
-        // Fallback categories if empty or failed
         if (!Array.isArray(catData) || catData.length === 0) {
             categories = [
                 { category_id: '1', category_name: 'IL: General Channels' },
@@ -102,14 +105,17 @@ async function initApp() {
 
         let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
         const streamApiUrl = buildApiUrl(streamAction);
+        console.log("Fetching streams via proxy:", getProxyUrl(streamApiUrl));
+
         const streamRes = await fetch(getProxyUrl(streamApiUrl));
+        console.log("Streams response status:", streamRes.status);
 
         let streamData = [];
         if (streamRes.ok) {
-            try { streamData = await streamRes.json(); } catch(e) {}
+            try { streamData = await streamRes.json(); } catch(e) { console.warn("Failed to parse streams JSON"); }
         }
+        console.log("Streams loaded data length:", Array.isArray(streamData) ? streamData.length : 'Not an array');
 
-        // Fallback streams if empty or failed
         if (!Array.isArray(streamData) || streamData.length === 0) {
             streams = [
                 { stream_id: '101', name: 'ערוץ בדיקה ראשון (Live)', category_id: '1' },
@@ -121,7 +127,7 @@ async function initApp() {
 
         goHome();
     } catch (err) {
-        console.error('Error in initApp:', err);
+        console.error('Error in initApp catch block:', err);
         categories = [{ category_id: '1', category_name: 'IL: General' }];
         streams = [{ stream_id: '101', name: 'ערוץ חירום ראשי', category_id: '1' }];
         goHome();
@@ -227,7 +233,7 @@ function renderProvidersView(countryCats) {
     countryCats.forEach(cat => {
         let parsed = parseCategoryName(cat.category_name);
         let catStreams = streams.filter(s => String(s.category_id) === String(cat.category_id));
-        if (catStreams.length === 0) catStreams = streams; // Fallback to all if empty
+        if (catStreams.length === 0) catStreams = streams;
 
         const tile = document.createElement('div');
         tile.className = 'bg-slate-800/90 hover:bg-slate-800 active:scale-[0.98] border border-slate-700/60 hover:border-cyan-500 p-3 sm:p-4 rounded-xl sm:rounded-2xl cursor-pointer transition flex flex-col justify-between shadow-lg group relative select-none';
