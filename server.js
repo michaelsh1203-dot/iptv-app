@@ -19,6 +19,19 @@ app.use('/proxy', (req, res) => {
             targetUrl = decodeURIComponent(targetUrl);
         }
 
+        // תיקון אוטומטי: אם הבקשה מגיעה ל-get.php, נמיר אותה לפורמט ה-API של Xtream כדי למנוע שגיאת 884
+        if (targetUrl.includes('/get.php')) {
+            // חילוץ פרטי השרת והמשתמש כדי לבנות כתובת player_api תקינה
+            const urlObj = new URL(targetUrl);
+            const baseUrl = `${urlObj.protocol}//${urlObj.host}`;
+            const params = new URLSearchParams(urlObj.search);
+            const username = params.get('username');
+            const password = params.get('password');
+            if (username && password) {
+                targetUrl = `${baseUrl}/player_api.php?username=${username}&password=${password}&action=get_live_streams`;
+            }
+        }
+
         const client = targetUrl.startsWith('https') ? https : http;
         
         const proxyReq = client.get(targetUrl, {
@@ -27,7 +40,6 @@ app.use('/proxy', (req, res) => {
                 'Accept': '*/*'
             }
         }, (proxyRes) => {
-            // If the upstream IPTV server returns an error, return a safe empty JSON array instead of 500
             if (proxyRes.statusCode !== 200) {
                 console.warn(`Upstream server returned status ${proxyRes.statusCode} for URL: ${targetUrl}`);
                 if (!res.headersSent) {
