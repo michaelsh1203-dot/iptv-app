@@ -28,7 +28,7 @@
             <div class="relative bg-black rounded-2xl overflow-hidden aspect-video shadow-2xl flex items-center justify-center border border-slate-800">
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
-            <div id="status-msg" class="text-xs text-slate-400 min-h-[20px]">טוען מערכת...</div>
+            <div id="status-msg" class="text-xs text-cyan-400 font-medium min-h-[20px]">מאתחל מערכת...</div>
         </div>
 
         <!-- Channels Container -->
@@ -50,24 +50,27 @@
             const statusEl = document.getElementById('status-msg');
             try {
                 if (statusEl) statusEl.innerText = 'טוען ערוצים מהשרת...';
-                console.log("Fetching /api/channels...");
                 
                 const res = await fetch('/api/channels');
-                console.log("Response status:", res.status);
-                
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Parsed channels data count:", Array.isArray(data) ? data.length : "Not an array");
-
-                if (!Array.isArray(data)) {
-                    throw new Error('הנתונים שהתקבלו אינם מערך תקין');
-                }
                 
-                allChannels = data.map(item => ({
-                    name: item.name || 'ערוץ ללא שם',
-                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
-                }));
+                // בדיקה אם הנתונים מגיעים כמערך או כאובייקט עטוף
+                let channelsArray = [];
+                if (Array.isArray(data)) {
+                    channelsArray = data;
+                } else if (data && Array.isArray(data.available_items)) {
+                    channelsArray = data.available_items;
+                } else if (data && typeof data === 'object') {
+                    // לפעמים Xtream מחזיר אובייקט שהמפתחות שלו הם מזהי הערוצים
+                    channelsArray = Object.values(data);
+                }
+
+                allChannels = channelsArray.map(item => ({
+                    name: item.name || item.title || 'ערוץ ללא שם',
+                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
+                })).filter(ch => ch.url);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
@@ -77,7 +80,7 @@
                 }
             } catch (err) {
                 console.error('Error in initApp:', err);
-                if (statusEl) statusEl.innerText = `שגיאה: ${err.message}`;
+                if (statusEl) statusEl.innerText = `שגיאה בטעינה: ${err.message}`;
             }
         }
 
