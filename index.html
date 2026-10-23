@@ -55,23 +55,41 @@
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("JSON Data received:", data);
+                console.log("Full API Response:", data);
 
-                if (!Array.isArray(data)) {
-                    throw new Error('הנתונים שהתקבלו אינם מערך תקין');
+                let rawList = [];
+                if (Array.isArray(data)) {
+                    rawList = data;
+                } else if (data && Array.isArray(data.available_items)) {
+                    rawList = data.available_items;
+                } else if (data && typeof data === 'object') {
+                    // חיפוש המערך הראשון שנמצא בתוך האובייקט
+                    const possibleArray = Object.values(data).find(val => Array.isArray(val));
+                    if (possibleArray) {
+                        rawList = possibleArray;
+                    } else {
+                        rawList = Object.values(data);
+                    }
                 }
 
-                // מיפוי מדויק לפי שדות ה-JSON שמוחזרים מהשרת
-                allChannels = data.map(item => ({
-                    name: item.name || 'ערוץ ללא שם',
-                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
-                }));
+                allChannels = rawList.map(item => {
+                    const name = item.name || item.title || item.stream_display_name || 'ערוץ ללא שם';
+                    const streamId = item.stream_id || item.id || item.num;
+                    if (!streamId) return null;
+
+                    return {
+                        name: name,
+                        url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${streamId}.m3u8`
+                    };
+                }).filter(ch => ch !== null && ch.url);
+
+                console.log("Successfully mapped channels:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
+                    statusEl.innerText = '⚠️ השרת החזיר נתונים אך ללא מזהי סטרים תקינים';
                 }
             } catch (err) {
                 console.error('Error in initApp:', err);
