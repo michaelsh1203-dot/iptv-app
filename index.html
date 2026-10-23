@@ -53,14 +53,10 @@
                 const res = await fetch('/api/channels');
                 if (!res.ok) throw new Error('שגיאה בטעינת הנתונים מהשרת');
                 
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    allChannels = data.map(item => ({
-                        stream_id: item.stream_id,
-                        name: item.name || 'ערוץ ללא שם',
-                        url: getProxyUrl(`http://thy30188.wd.business-cloud-8.ru/live/d48e6682bdb8/a6af461b63/${item.stream_id}.ts`)
-                    }));
-                    
+                const text = await res.text();
+                allChannels = parseM3U(text);
+
+                if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     document.getElementById('status-msg').innerText = `נטענו בהצלחה ${allChannels.length} ערוצים`;
                 } else {
@@ -70,6 +66,25 @@
                 console.error('Error fetching channels:', err);
                 document.getElementById('status-msg').innerText = 'שגיאה בהתחברות לשרת';
             }
+        }
+
+        function parseM3U(data) {
+            const lines = data.split('\n');
+            const channels = [];
+            let currentChannel = {};
+
+            for (let line of lines) {
+                line = line.trim();
+                if (line.startsWith('#EXTINF:')) {
+                    const nameMatch = line.match(/,(.+)$/);
+                    currentChannel.name = nameMatch ? nameMatch[1] : 'ערוץ ללא שם';
+                } else if (line && !line.startsWith('#')) {
+                    currentChannel.url = getProxyUrl(line);
+                    channels.push({ ...currentChannel });
+                    currentChannel = {};
+                }
+            }
+            return channels;
         }
 
         function renderChannels(channels) {

@@ -13,9 +13,9 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// נתיב מאובטח לשליפת הערוצים עם User-Agent של VLC לעקיפת חסימות 513
+// נתיב מאובטח לשליפת רשימת הערוצים בפורמט M3U (יציב לחלוטין מול ספקי Xtream)
 app.get('/api/channels', (req, res) => {
-    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
+    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
     
     const client = targetUrl.startsWith('https') ? https : http;
     
@@ -28,7 +28,7 @@ app.get('/api/channels', (req, res) => {
         if (proxyRes.statusCode !== 200) {
             console.warn(`Upstream server returned status ${proxyRes.statusCode}`);
             if (!res.headersSent) {
-                return res.status(200).json([]);
+                return res.status(200).send('');
             }
         }
 
@@ -47,7 +47,7 @@ app.get('/api/channels', (req, res) => {
     proxyReq.on('error', (err) => {
         console.error('Proxy Request Error:', err.message);
         if (!res.headersSent) {
-            res.status(200).json([]);
+            res.status(200).send('');
         }
     });
 });
