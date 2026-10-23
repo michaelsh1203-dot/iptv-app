@@ -50,9 +50,7 @@
             try {
                 document.getElementById('status-msg').innerText = 'טוען ערוצים מהשרת המאובטח...';
                 
-                // פנייה לנתיב החדש בשרת שמסתיר את הסיסמה לחלוטין מהדפדפן
                 const res = await fetch('/api/channels');
-                
                 if (!res.ok) throw new Error('שגיאה בטעינת הנתונים מהשרת');
                 
                 const data = await res.json();
@@ -60,7 +58,6 @@
                     allChannels = data.map(item => ({
                         stream_id: item.stream_id,
                         name: item.name || 'ערוץ ללא שם',
-                        // קישור הסטרים מנותב דרך הפרוקסי של השרת
                         url: getProxyUrl(`http://thy30188.wd.business-cloud-8.ru/live/d48e6682bdb8/a6af461b63/${item.stream_id}.ts`)
                     }));
                     

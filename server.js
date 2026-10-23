@@ -8,12 +8,12 @@ const PORT = process.env.PORT || 10000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// פרטי ספק ה-IPTV מוגדרים בצד השרת בלבד (מאובטח לחלוטין)
+// פרטי ספק ה-IPTV מאובטחים בצד השרת בלבד
 const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// נתיב מאובטח לשליפת הערוצים ישירות מול הספק
+// נתיב מאובטח לשליפת הערוצים עם User-Agent של VLC לעקיפת חסימות 513
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
     
@@ -21,7 +21,7 @@ app.get('/api/channels', (req, res) => {
     
     const proxyReq = client.get(targetUrl, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
             'Accept': '*/*'
         }
     }, (proxyRes) => {
@@ -52,7 +52,7 @@ app.get('/api/channels', (req, res) => {
     });
 });
 
-// פרוקסי כללי להזרמת ניגון ערוצים (וידאו/סטרימים)
+// פרוקסי להזרמת הסטרימים עצמם
 app.use('/proxy', (req, res) => {
     let targetUrl = req.query.url;
     if (!targetUrl) {
@@ -68,7 +68,7 @@ app.use('/proxy', (req, res) => {
         
         const proxyReq = client.get(targetUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
                 'Accept': '*/*'
             }
         }, (proxyRes) => {
