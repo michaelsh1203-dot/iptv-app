@@ -14,7 +14,6 @@ const IPTV_PASS = 'a6af461b63';
 
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
-    
     const client = targetUrl.startsWith('https') ? https : http;
     
     let rawData = '';
@@ -24,28 +23,17 @@ app.get('/api/channels', (req, res) => {
             'Accept': 'application/json'
         }
     }, (proxyRes) => {
-        proxyRes.on('data', (chunk) => {
-            rawData += chunk;
-        });
-
+        proxyRes.on('data', (chunk) => { rawData += chunk; });
         proxyRes.on('end', () => {
             try {
                 const jsonParsed = JSON.parse(rawData);
-                
-                // ודא שאנחנו מחזירים מערך נקי תמיד ללקוח
                 let channelsArray = [];
                 if (Array.isArray(jsonParsed)) {
                     channelsArray = jsonParsed;
                 } else if (jsonParsed && typeof jsonParsed === 'object') {
-                    // אם זה אובייקט מעטפת, נמצא את המערך בפנים או נמיר את הערכים
                     const foundKey = Object.keys(jsonParsed).find(k => Array.isArray(jsonParsed[k]));
-                    if (foundKey) {
-                        channelsArray = jsonParsed[foundKey];
-                    } else {
-                        channelsArray = Object.values(jsonParsed);
-                    }
+                    channelsArray = foundKey ? jsonParsed[foundKey] : Object.values(jsonParsed);
                 }
-
                 res.setHeader('Content-Type', 'application/json');
                 res.status(200).json(channelsArray);
             } catch (e) {
@@ -61,17 +49,13 @@ app.get('/api/channels', (req, res) => {
 
 app.use('/proxy', (req, res) => {
     let targetUrl = req.query.url;
-    if (!targetUrl) {
-        return res.status(400).json({ error: 'Missing target URL' });
-    }
+    if (!targetUrl) return res.status(400).json({ error: 'Missing target URL' });
 
     try {
         if (targetUrl.includes('%3A') || targetUrl.includes('%2F')) {
             targetUrl = decodeURIComponent(targetUrl);
         }
-
         const client = targetUrl.startsWith('https') ? https : http;
-        
         const proxyReq = client.get(targetUrl, {
             headers: {
                 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
@@ -88,15 +72,11 @@ app.use('/proxy', (req, res) => {
             proxyRes.pipe(res);
         });
 
-        proxyReq.on('error', (err) => {
-            if (!res.headersSent) {
-                res.status(500).send('Proxy error');
-            }
+        proxyReq.on('error', () => {
+            if (!res.headersSent) res.status(500).send('Proxy error');
         });
     } catch (err) {
-        if (!res.headersSent) {
-            res.status(500).send('Server error');
-        }
+        if (!res.headersSent) res.status(500).send('Server error');
     }
 });
 
