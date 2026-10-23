@@ -6,7 +6,7 @@ const https = require('https');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// נתוני חיבור לשרת ה-IPTV
+// נתוני חיבור לשרת ה-IPTV (בשימוש בכתובת http המקורית של הספק)
 const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
@@ -15,13 +15,7 @@ const IPTV_PASS = 'a6af461b63';
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
     
-    const options = {
-        headers: {
-            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18'
-        }
-    };
-
-    http.get(targetUrl, options, (externalRes) => {
+    http.get(targetUrl, (externalRes) => {
         let data = '';
         externalRes.on('data', (chunk) => {
             data += chunk;
@@ -39,14 +33,12 @@ app.get('/api/channels', (req, res) => {
     });
 });
 
-// פרוקסי מעודכן עם זיהוי נגן VLC אמיתי לעקיפת חסימת הספק
+// פרוקסי שרת שמוריד את הזרם מהספק ב-http ומעביר לדפדפן בצורה חלקה
 app.get('/proxy', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
         return res.status(400).send('Missing url parameter');
     }
-
-    const client = targetUrl.startsWith('https') ? https : http;
 
     const options = {
         headers: {
@@ -55,7 +47,7 @@ app.get('/proxy', (req, res) => {
         }
     };
 
-    client.get(targetUrl, options, (streamRes) => {
+    http.get(targetUrl, options, (streamRes) => {
         res.writeHead(streamRes.statusCode, streamRes.headers);
         streamRes.pipe(res);
     }).on('error', (err) => {
