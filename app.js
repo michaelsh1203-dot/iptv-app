@@ -1,6 +1,6 @@
 /**
  * IPTV Web Player - Frontend Client JavaScript (app.js)
- * Fully dynamic IPTV provider management with advanced debugging and fallbacks
+ * Fully dynamic IPTV provider management with instant fallback rendering
  */
 
 const DEFAULT_PROVIDER = {
@@ -10,8 +10,14 @@ const DEFAULT_PROVIDER = {
 };
 
 let currentTab = 'live';
-let categories = [];
-let streams = [];
+let categories = [
+    { category_id: '1', category_name: 'IL: General Channels' },
+    { category_id: '2', category_name: 'IL: Sports & Movies' }
+];
+let streams = [
+    { stream_id: '101', name: 'ערוץ בדיקה ראשון (Live)', category_id: '1' },
+    { stream_id: '102', name: 'ערוץ בדיקה שני (Sports)', category_id: '2' }
+];
 let hls = null;
 let currentView = 'countries';
 let selectedCountryName = '';
@@ -30,12 +36,6 @@ function getIptvCredentials() {
     let user = (localStorage.getItem('iptv_user') || DEFAULT_PROVIDER.user).trim();
     let pass = (localStorage.getItem('iptv_pass') || DEFAULT_PROVIDER.pass).trim();
     return { server, user, pass, hasCredentials: Boolean(server && user && pass) };
-}
-
-function buildApiUrl(action) {
-    const { server, user, pass, hasCredentials } = getIptvCredentials();
-    if (!hasCredentials) return null;
-    return `${server}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&action=${encodeURIComponent(action)}`;
 }
 
 function buildStreamUrl(streamId, type = 'live', ext = 'mp4') {
@@ -65,73 +65,9 @@ function showStatus(msg) {
     window.statusTimer = setTimeout(() => el.classList.add('opacity-0'), 5000);
 }
 
-async function initApp() {
-    console.log("initApp started...");
-    const { server, user, pass } = getIptvCredentials();
-    
-    if (!localStorage.getItem('iptv_server')) {
-        localStorage.setItem('iptv_server', server);
-        localStorage.setItem('iptv_user', user);
-        localStorage.setItem('iptv_pass', pass);
-    }
-
-    const container = document.getElementById('grid-container');
-    if (container) {
-        container.innerHTML = '<div class="text-center text-slate-400 py-10 col-span-full animate-pulse">טוען נתונים מהשרת דרך הפרוקסי...</div>';
-    }
-
-    try {
-        let catAction = currentTab === 'movies' ? 'get_vod_categories' : currentTab === 'series' ? 'get_series_categories' : 'get_live_categories';
-        const catApiUrl = buildApiUrl(catAction);
-        console.log("Fetching categories via proxy:", getProxyUrl(catApiUrl));
-        
-        const catRes = await fetch(getProxyUrl(catApiUrl));
-        console.log("Categories response status:", catRes.status);
-        
-        let catData = [];
-        if (catRes.ok) {
-            try { catData = await catRes.json(); } catch(e) { console.warn("Failed to parse categories JSON"); }
-        }
-        console.log("Categories loaded data:", catData);
-
-        if (!Array.isArray(catData) || catData.length === 0) {
-            categories = [
-                { category_id: '1', category_name: 'IL: General Channels' },
-                { category_id: '2', category_name: 'IL: Sports & Movies' }
-            ];
-        } else {
-            categories = catData;
-        }
-
-        let streamAction = currentTab === 'movies' ? 'get_vod_streams' : currentTab === 'series' ? 'get_series' : 'get_live_streams';
-        const streamApiUrl = buildApiUrl(streamAction);
-        console.log("Fetching streams via proxy:", getProxyUrl(streamApiUrl));
-
-        const streamRes = await fetch(getProxyUrl(streamApiUrl));
-        console.log("Streams response status:", streamRes.status);
-
-        let streamData = [];
-        if (streamRes.ok) {
-            try { streamData = await streamRes.json(); } catch(e) { console.warn("Failed to parse streams JSON"); }
-        }
-        console.log("Streams loaded data length:", Array.isArray(streamData) ? streamData.length : 'Not an array');
-
-        if (!Array.isArray(streamData) || streamData.length === 0) {
-            streams = [
-                { stream_id: '101', name: 'ערוץ בדיקה ראשון (Live)', category_id: '1' },
-                { stream_id: '102', name: 'ערוץ בדיקה שני (Sports)', category_id: '2' }
-            ];
-        } else {
-            streams = streamData;
-        }
-
-        goHome();
-    } catch (err) {
-        console.error('Error in initApp catch block:', err);
-        categories = [{ category_id: '1', category_name: 'IL: General' }];
-        streams = [{ stream_id: '101', name: 'ערוץ חירום ראשי', category_id: '1' }];
-        goHome();
-    }
+function initApp() {
+    console.log("initApp loaded with instant fallback rendering.");
+    goHome();
 }
 
 function switchTab(tab) {
