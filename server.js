@@ -15,7 +15,13 @@ const IPTV_PASS = 'a6af461b63';
 app.get('/api/channels', (req, res) => {
     const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
     
-    http.get(targetUrl, (externalRes) => {
+    const options = {
+        headers: {
+            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18'
+        }
+    };
+
+    http.get(targetUrl, options, (externalRes) => {
         let data = '';
         externalRes.on('data', (chunk) => {
             data += chunk;
@@ -33,7 +39,7 @@ app.get('/api/channels', (req, res) => {
     });
 });
 
-// פרוקסי מתוקן שמעביר כותרות כדי למנוע חסימת 511 מצד הספק
+// פרוקסי מעודכן עם זיהוי נגן VLC אמיתי לעקיפת חסימת הספק
 app.get('/proxy', (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) {
@@ -44,7 +50,8 @@ app.get('/proxy', (req, res) => {
 
     const options = {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18',
+            'Accept': '*/*'
         }
     };
 
