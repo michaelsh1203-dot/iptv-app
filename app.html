@@ -15,7 +15,7 @@
             📺 IPTV Player
         </h1>
         <div>
-            <button onclick="loadChannels()" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-base font-bold transition shadow-lg cursor-pointer">
+            <button onclick="loadChannels()" class="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-base font-bold transition shadow-lg cursor-pointer text-white">
                 ▶ טען ערוצים עכשיו
             </button>
         </div>
@@ -29,7 +29,7 @@
                 <video id="video-player" controls class="w-full h-full"></video>
             </div>
             <div id="status-msg" class="text-sm text-cyan-400 font-bold bg-slate-800 p-3 rounded-lg border border-slate-700 text-center">
-                טוען ערוצים אוטומטית...
+                מוכן לטעינה...
             </div>
         </div>
 
@@ -41,7 +41,6 @@
     </main>
 
     <script>
-        console.log("Script loaded successfully!");
         let hls = null;
         let allChannels = [];
         
@@ -50,28 +49,21 @@
         const IPTV_PASS = 'a6af461b63';
 
         async function loadChannels() {
-            console.log("loadChannels() called!");
             const statusEl = document.getElementById('status-msg');
-            const container = document.getElementById('grid-container');
             
             try {
                 if(statusEl) statusEl.innerText = '🔄 מתחבר לשרת ושולף ערוצים...';
                 
                 const res = await fetch('/api/channels');
-                console.log("Fetch response status:", res.status);
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("Data received:", data);
-
                 let rawList = Array.isArray(data) ? data : Object.values(data);
 
                 allChannels = rawList.map(item => ({
                     name: item.name || item.title || 'ערוץ ללא שם',
                     url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
                 })).filter(ch => ch.url && !ch.url.includes('undefined'));
-
-                console.log("Parsed channels count:", allChannels.length);
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
@@ -80,7 +72,7 @@
                     if(statusEl) statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
-                console.error('Error in loadChannels:', err);
+                console.error('Error:', err);
                 if(statusEl) statusEl.innerText = `❌ שגיאה: ${err.message}`;
             }
         }
@@ -131,11 +123,8 @@
             }
         }
 
-        // טעינה אוטומטית מיד בעליית הדף
-        window.onload = function() {
-            console.log("Window loaded, calling loadChannels...");
-            loadChannels();
-        };
+        // טעינה אוטומטית מיד כשעולה הדף
+        window.onload = loadChannels;
     </script>
 </body>
 </html>
