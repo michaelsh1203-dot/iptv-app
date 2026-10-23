@@ -12,20 +12,20 @@ const IPTV_SERVER = 'http://thy30188.wd.business-cloud-8.ru';
 const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
-// נתיב לשליפת הערוצים בצורה ישירה וחסינה
+// שליפת רשימת הערוצים דרך Xtream API (מחזיר JSON נקי)
 app.get('/api/channels', (req, res) => {
-    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u_plus`;
-    console.log("Fetching M3U from IPTV provider:", targetUrl);
+    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
+    console.log("Fetching from Xtream API:", targetUrl);
     
     const client = targetUrl.startsWith('https') ? https : http;
     
     const proxyReq = client.get(targetUrl, {
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': '*/*'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
         }
     }, (proxyRes) => {
-        console.log("IPTV Response Status:", proxyRes.statusCode);
+        console.log("IPTV API Response Status:", proxyRes.statusCode);
         
         res.status(proxyRes.statusCode);
         Object.keys(proxyRes.headers).forEach((key) => {
@@ -39,9 +39,9 @@ app.get('/api/channels', (req, res) => {
     });
 
     proxyReq.on('error', (err) => {
-        console.error("IPTV Request Error:", err.message);
+        console.error("IPTV API Error:", err.message);
         if (!res.headersSent) {
-            res.status(500).send('Proxy request error');
+            res.status(500).json({ error: 'Failed to fetch channels' });
         }
     });
 });
