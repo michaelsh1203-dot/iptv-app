@@ -55,25 +55,23 @@
                 if (!res.ok) throw new Error(`שגיאת שרת: ${res.status}`);
                 
                 const data = await res.json();
-                console.log("API JSON data:", data);
+                console.log("JSON Data received:", data);
 
-                let rawList = [];
-                if (Array.isArray(data)) {
-                    rawList = data;
-                } else if (data && typeof data === 'object') {
-                    rawList = Object.values(data);
+                if (!Array.isArray(data)) {
+                    throw new Error('הנתונים שהתקבלו אינם מערך תקין');
                 }
 
-                allChannels = rawList.map(item => ({
-                    name: item.name || item.title || 'ערוץ ללא שם',
-                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id || item.id}.m3u8`
-                })).filter(ch => ch.url && !ch.url.includes('undefined'));
+                // מיפוי מדויק לפי שדות ה-JSON שמוחזרים מהשרת
+                allChannels = data.map(item => ({
+                    name: item.name || 'ערוץ ללא שם',
+                    url: `${IPTV_SERVER}/live/${IPTV_USER}/${IPTV_PASS}/${item.stream_id}.m3u8`
+                }));
 
                 if (allChannels.length > 0) {
                     renderChannels(allChannels);
                     statusEl.innerText = `✅ נטענו בהצלחה ${allChannels.length} ערוצים!`;
                 } else {
-                    statusEl.innerText = '⚠️ השרת החזיר נתונים ריקים';
+                    statusEl.innerText = '⚠️ רשימת הערוצים ריקה';
                 }
             } catch (err) {
                 console.error('Error in initApp:', err);
@@ -126,6 +124,9 @@
                 statusEl.innerText = '▶ מנגן בהצלחה!';
             }
         }
+
+        // טעינה אוטומטית בעליית הדף
+        window.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
