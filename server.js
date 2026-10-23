@@ -13,9 +13,9 @@ const IPTV_USER = 'd48e6682bdb8';
 const IPTV_PASS = 'a6af461b63';
 
 app.get('/api/channels', (req, res) => {
-    // מנסים כעת פורמט m3u רגיל במקום m3u_plus כדי לעקוף את שגיאת הספק
-    const targetUrl = `${IPTV_SERVER}/get.php?username=${IPTV_USER}&password=${IPTV_PASS}&type=m3u`;
-    console.log("Fetching from IPTV provider:", targetUrl);
+    // מעבר ל-Xtream API רשמי שמחזיר את רשימת הערוצים בפורמט JSON
+    const targetUrl = `${IPTV_SERVER}/player_api.php?username=${IPTV_USER}&password=${IPTV_PASS}&action=get_live_streams`;
+    console.log("Fetching from IPTV API:", targetUrl);
     
     const client = targetUrl.startsWith('https') ? https : http;
     
